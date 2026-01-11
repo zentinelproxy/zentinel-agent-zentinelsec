@@ -1,0 +1,59 @@
+[package]
+name = "sentinel-agent-sentinelsec"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Sentinel Contributors"]
+license = "Apache-2.0"
+repository = "https://github.com/raskell-io/sentinel-agent-sentinelsec"
+homepage = "https://sentinel.raskell.io"
+documentation = "https://sentinel.raskell.io/docs/agents/sentinelsec"
+description = "Pure Rust ModSecurity-compatible WAF agent for Sentinel - Full OWASP CRS support without C dependencies"
+keywords = ["proxy", "reverse-proxy", "agent", "waf", "security", "modsecurity"]
+categories = ["network-programming"]
+readme = "README.md"
+
+[lib]
+name = "sentinel_agent_sentinelsec"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sentinel-sentinelsec-agent"
+path = "src/main.rs"
+
+[dependencies]
+# Sentinel protocol (using local path for development)
+sentinel-agent-protocol = { path = "../sentinel/crates/agent-protocol" }
+sentinel-common = { path = "../sentinel/crates/common" }
+
+# Pure Rust ModSecurity implementation
+sentinel-modsec = { path = "../sentinel-modsec" }
+
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+async-trait = "0.1"
+
+# Glob pattern matching for rule files
+glob = "0.3"
+
+# Base64 decoding for body chunks
+base64 = "0.22"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Command line
+clap = { version = "4.5", features = ["derive", "env"] }
+
+[dev-dependencies]
+tempfile = "3.12"
+uuid = { version = "1.10", features = ["v4"] }
