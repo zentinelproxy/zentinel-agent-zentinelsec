@@ -32,7 +32,7 @@ use sentinel_agent_protocol::{
     RequestHeadersEvent, ResponseBodyChunkEvent, ResponseHeadersEvent,
 };
 
-use sentinel_modsec::{CompiledRuleset, ModSecurity};
+use sentinel_modsec::ModSecurity;
 
 /// SentinelSec configuration
 #[derive(Debug, Clone)]
@@ -274,7 +274,7 @@ impl SentinelSecAgent {
 
         // Check for intervention after headers
         if let Some(intervention) = tx.intervention() {
-            let status = intervention.status();
+            let status = intervention.status;
             if status != 0 && status != 200 {
                 debug!(
                     correlation_id = correlation_id,
@@ -296,7 +296,7 @@ impl SentinelSecAgent {
 
                 // Check for intervention after body
                 if let Some(intervention) = tx.intervention() {
-                    let status = intervention.status();
+                    let status = intervention.status;
                     if status != 0 && status != 200 {
                         debug!(
                             correlation_id = correlation_id,
