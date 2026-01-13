@@ -1,0 +1,137 @@
+name: Release
+
+# DISABLED: Uncomment the 'on' block below to enable releases
+# on:
+#   push:
+#     tags:
+#       - 'v*'
+
+on:
+  workflow_dispatch:  # Manual trigger only for now
+
+env:
+  CARGO_TERM_COLOR: always
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/sentinel-sentinelsec
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: false  # Disabled - set to true to enable crates.io publishing
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to crates.io
+        run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        continue-on-error: true
+
+  build:
+    runs-on: ubuntu-latest
+    if: false  # Disabled - set to true to enable builds
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Build release binary
+        run: |
+          cargo build --release
+          strip target/release/sentinel-sentinelsec-agent
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          cp target/release/sentinel-sentinelsec-agent artifacts/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentinel-sentinelsec-linux-amd64
+          path: artifacts/
+          retention-days: 7
+
+  docker:
+    needs: build
+    runs-on: ubuntu-latest
+    if: false  # Disabled - set to true to enable Docker builds
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download AMD64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sentinel-sentinelsec-linux-amd64
+          path: artifacts/linux-amd64
+
+      - name: Prepare artifact
+        run: chmod +x artifacts/linux-amd64/sentinel-sentinelsec-agent
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: artifacts/linux-amd64
+          file: ./Dockerfile
+          target: prebuilt
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          provenance: false
+
+  release:
+    needs: [build, docker]
+    runs-on: ubuntu-latest
+    if: false  # Disabled - set to true to enable releases
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download AMD64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sentinel-sentinelsec-linux-amd64
+          path: artifacts/linux-amd64
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          mv artifacts/linux-amd64/sentinel-sentinelsec-agent release/sentinel-sentinelsec-agent-linux-amd64
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/*
+          generate_release_notes: true
