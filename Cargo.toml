@@ -9,7 +9,7 @@ repository = "https://github.com/raskell-io/sentinel-agent-sentinelsec"
 homepage = "https://sentinel.raskell.io"
 documentation = "https://sentinel.raskell.io/docs/agents/sentinelsec"
 description = "Pure Rust ModSecurity-compatible WAF agent for Sentinel - Full OWASP CRS support without C dependencies"
-keywords = ["proxy", "reverse-proxy", "agent", "waf", "security", "modsecurity"]
+keywords = ["sentinel", "proxy", "agent", "waf", "modsecurity"]
 categories = ["network-programming"]
 readme = "README.md"
 
