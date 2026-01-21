@@ -35,7 +35,16 @@ jobs:
             artifact: darwin-aarch64
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout agent
+        uses: actions/checkout@v4
+        with:
+          path: agent
+
+      - name: Checkout SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raskell-io/sentinel-agent-rust-sdk
+          path: sentinel-agent-rust-sdk
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -57,25 +66,26 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            agent/target/
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('agent/**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.target }}-cargo-
 
       - name: Build release binary
+        working-directory: agent
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Strip binary (Linux native)
         if: matrix.target == 'x86_64-unknown-linux-gnu'
-        run: strip target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
+        run: strip agent/target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
 
       - name: Strip binary (Linux cross)
         if: matrix.cross
-        run: aarch64-linux-gnu-strip target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
+        run: aarch64-linux-gnu-strip agent/target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
 
       - name: Strip binary (macOS)
         if: contains(matrix.target, 'darwin')
-        run: strip target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
+        run: strip agent/target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
 
       - name: Determine version
         id: version
@@ -89,7 +99,7 @@ jobs:
       - name: Package binary
         run: |
           mkdir -p dist
-          cp target/${{ matrix.target }}/release/${{ env.BINARY_NAME }} dist/
+          cp agent/target/${{ matrix.target }}/release/${{ env.BINARY_NAME }} dist/
           cd dist
           tar -czvf ${{ env.BINARY_NAME }}-${{ steps.version.outputs.version }}-${{ matrix.artifact }}.tar.gz ${{ env.BINARY_NAME }}
 
