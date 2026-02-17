@@ -1,33 +1,33 @@
 [package]
-name = "sentinel-agent-sentinelsec"
+name = "zentinel-agent-zentinelsec"
 version = "0.2.0"
 edition = "2021"
 rust-version = "1.75"
-authors = ["Sentinel Contributors"]
+authors = ["Zentinel Contributors"]
 license = "Apache-2.0"
-repository = "https://github.com/raskell-io/sentinel-agent-sentinelsec"
-homepage = "https://sentinel.raskell.io"
-documentation = "https://sentinel.raskell.io/docs/agents/sentinelsec"
-description = "Pure Rust ModSecurity-compatible WAF agent for Sentinel - Full OWASP CRS support without C dependencies"
-keywords = ["sentinel", "proxy", "agent", "waf", "modsecurity"]
+repository = "https://github.com/zentinelproxy/zentinel-agent-zentinelsec"
+homepage = "https://zentinelproxy.io"
+documentation = "https://zentinelproxy.io/docs/agents/zentinelsec"
+description = "Pure Rust ModSecurity-compatible WAF agent for Zentinel - Full OWASP CRS support without C dependencies"
+keywords = ["zentinel", "proxy", "agent", "waf", "modsecurity"]
 categories = ["network-programming"]
 readme = "README.md"
 
 [lib]
-name = "sentinel_agent_sentinelsec"
+name = "zentinel_agent_zentinelsec"
 path = "src/lib.rs"
 
 [[bin]]
-name = "sentinel-sentinelsec-agent"
+name = "zentinel-zentinelsec-agent"
 path = "src/main.rs"
 
 [dependencies]
-# Sentinel protocol
-sentinel-agent-protocol = "0.3"
-sentinel-common = "0.3"
+# Zentinel protocol
+zentinel-agent-protocol = "0.3"
+zentinel-common = "0.3"
 
 # Pure Rust ModSecurity implementation
-sentinel-modsec = "0.1"
+zentinel-modsec = "0.1"
 
 # Async runtime
 tokio = { version = "1.40", features = ["full"] }

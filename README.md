@@ -1,8 +1,8 @@
-# sentinel-agent-sentinelsec
+# zentinel-agent-zentinelsec
 
-A pure Rust ModSecurity-compatible WAF agent for [Sentinel](https://github.com/raskell-io/sentinel) reverse proxy. Provides full OWASP Core Rule Set (CRS) support with **zero C dependencies** - no libmodsecurity required.
+A pure Rust ModSecurity-compatible WAF agent for [Zentinel](https://github.com/zentinelproxy/zentinel) reverse proxy. Provides full OWASP Core Rule Set (CRS) support with **zero C dependencies** - no libmodsecurity required.
 
-> **Note:** CRS compatibility depends on the [sentinel-modsec](https://github.com/raskell-io/sentinel-modsec) engine, a pure Rust reimplementation of libmodsecurity. If you encounter unsupported SecLang features, please [file an issue](https://github.com/raskell-io/sentinel-agent-sentinelsec/issues).
+> **Note:** CRS compatibility depends on the [zentinel-modsec](https://github.com/zentinelproxy/zentinel-modsec) engine, a pure Rust reimplementation of libmodsecurity. If you encounter unsupported SecLang features, please [file an issue](https://github.com/zentinelproxy/zentinel-agent-zentinelsec/issues).
 
 ## Features
 
@@ -18,7 +18,7 @@ A pure Rust ModSecurity-compatible WAF agent for [Sentinel](https://github.com/r
 
 ## Comparison with Other WAF Agents
 
-| Feature | SentinelSec | ModSec | WAF |
+| Feature | ZentinelSec | ModSec | WAF |
 |---------|-------------|--------|-----|
 | Detection Rules | 800+ CRS rules | 800+ CRS rules | 285 rules |
 | SecLang Support | Yes | Yes | No |
@@ -28,29 +28,29 @@ A pure Rust ModSecurity-compatible WAF agent for [Sentinel](https://github.com/r
 | Binary Size | ~10MB | ~50MB | ~5MB |
 | Installation | `cargo install` | Requires libmodsecurity | `cargo install` |
 
-**SentinelSec combines the best of both worlds**: Full CRS compatibility like ModSec, with zero-dependency installation like WAF.
+**ZentinelSec combines the best of both worlds**: Full CRS compatibility like ModSec, with zero-dependency installation like WAF.
 
 ## Installation
 
 ### From crates.io
 
 ```bash
-cargo install sentinel-agent-sentinelsec
+cargo install zentinel-agent-zentinelsec
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/raskell-io/sentinel-agent-sentinelsec
-cd sentinel-agent-sentinelsec
+git clone https://github.com/zentinelproxy/zentinel-agent-zentinelsec
+cd zentinel-agent-zentinelsec
 cargo build --release
 ```
 
 ## Usage
 
 ```bash
-sentinel-sentinelsec-agent \
-  --socket /var/run/sentinel/sentinelsec.sock \
+zentinel-zentinelsec-agent \
+  --socket /var/run/zentinel/zentinelsec.sock \
   --rules /etc/modsecurity/crs/crs-setup.conf \
   --rules "/etc/modsecurity/crs/rules/*.conf"
 ```
@@ -59,14 +59,14 @@ sentinel-sentinelsec-agent \
 
 | Option | Environment Variable | Description | Default |
 |--------|---------------------|-------------|---------|
-| `--socket` | `AGENT_SOCKET` | Unix socket path | `/tmp/sentinel-sentinelsec.sock` |
-| `--rules` | `SENTINELSEC_RULES` | Rule file paths (glob patterns supported) | - |
-| `--block-mode` | `SENTINELSEC_BLOCK_MODE` | Block (true) or detect-only (false) | `true` |
-| `--exclude-paths` | `SENTINELSEC_EXCLUDE_PATHS` | Paths to exclude (comma-separated) | - |
-| `--body-inspection` | `SENTINELSEC_BODY_INSPECTION` | Enable request body inspection | `true` |
-| `--max-body-size` | `SENTINELSEC_MAX_BODY_SIZE` | Maximum body size to inspect (bytes) | `1048576` (1MB) |
-| `--response-inspection` | `SENTINELSEC_RESPONSE_INSPECTION` | Enable response body inspection | `false` |
-| `--verbose`, `-v` | `SENTINELSEC_VERBOSE` | Enable debug logging | `false` |
+| `--socket` | `AGENT_SOCKET` | Unix socket path | `/tmp/zentinel-zentinelsec.sock` |
+| `--rules` | `ZENTINELSEC_RULES` | Rule file paths (glob patterns supported) | - |
+| `--block-mode` | `ZENTINELSEC_BLOCK_MODE` | Block (true) or detect-only (false) | `true` |
+| `--exclude-paths` | `ZENTINELSEC_EXCLUDE_PATHS` | Paths to exclude (comma-separated) | - |
+| `--body-inspection` | `ZENTINELSEC_BODY_INSPECTION` | Enable request body inspection | `true` |
+| `--max-body-size` | `ZENTINELSEC_MAX_BODY_SIZE` | Maximum body size to inspect (bytes) | `1048576` (1MB) |
+| `--response-inspection` | `ZENTINELSEC_RESPONSE_INSPECTION` | Enable response body inspection | `false` |
+| `--verbose`, `-v` | `ZENTINELSEC_VERBOSE` | Enable debug logging | `false` |
 
 ## OWASP CRS Setup
 
@@ -84,20 +84,20 @@ sudo cp /etc/modsecurity/crs/crs-setup.conf.example /etc/modsecurity/crs/crs-set
 ### Run with CRS
 
 ```bash
-sentinel-sentinelsec-agent \
-  --socket /var/run/sentinel/sentinelsec.sock \
+zentinel-zentinelsec-agent \
+  --socket /var/run/zentinel/zentinelsec.sock \
   --rules /etc/modsecurity/crs/crs-setup.conf \
   --rules "/etc/modsecurity/crs/rules/*.conf"
 ```
 
-## Sentinel Configuration
+## Zentinel Configuration
 
 ```kdl
 agents {
-    agent "sentinelsec" {
+    agent "zentinelsec" {
         type "custom"
         transport "unix_socket" {
-            path "/var/run/sentinel/sentinelsec.sock"
+            path "/var/run/zentinel/zentinelsec.sock"
         }
         events ["request_headers", "request_body_chunk", "response_body_chunk"]
         timeout-ms 100
@@ -109,7 +109,7 @@ routes {
     route "all" {
         matches { path-prefix "/" }
         upstream "backend"
-        agents ["sentinelsec"]
+        agents ["zentinelsec"]
     }
 }
 ```
@@ -159,12 +159,12 @@ SecAction "id:900000,phase:1,pass,t:none,nolog,setvar:tx.blocking_paranoia_level
 # Environment variables
 env:
   - name: AGENT_SOCKET
-    value: "/var/run/sentinel/sentinelsec.sock"
-  - name: SENTINELSEC_RULES
+    value: "/var/run/zentinel/zentinelsec.sock"
+  - name: ZENTINELSEC_RULES
     value: "/etc/modsecurity/crs/crs-setup.conf,/etc/modsecurity/crs/rules/*.conf"
-  - name: SENTINELSEC_BLOCK_MODE
+  - name: ZENTINELSEC_BLOCK_MODE
     value: "true"
-  - name: SENTINELSEC_EXCLUDE_PATHS
+  - name: ZENTINELSEC_EXCLUDE_PATHS
     value: "/health,/metrics"
 ```
 
@@ -187,7 +187,7 @@ SecRule RESPONSE_BODY "@rx \b\d{3}-\d{2}-\d{4}\b" \
 Load custom rules:
 
 ```bash
-sentinel-sentinelsec-agent \
+zentinel-zentinelsec-agent \
   --rules /etc/modsecurity/crs/crs-setup.conf \
   --rules "/etc/modsecurity/crs/rules/*.conf" \
   --rules /etc/modsecurity/custom-rules.conf
@@ -208,7 +208,7 @@ cargo build --release
 
 ## Architecture
 
-SentinelSec uses [sentinel-modsec](https://github.com/raskell-io/sentinel-modsec), a pure Rust reimplementation of libmodsecurity:
+ZentinelSec uses [zentinel-modsec](https://github.com/zentinelproxy/zentinel-modsec), a pure Rust reimplementation of libmodsecurity:
 
 - **Parser**: Full SecLang parser for SecRule, SecAction, SecMarker directives
 - **Variables**: REQUEST_URI, ARGS, REQUEST_HEADERS, TX collections, and more

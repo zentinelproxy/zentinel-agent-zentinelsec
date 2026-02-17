@@ -1,20 +1,20 @@
-//! Sentinel SentinelSec Agent Library
+//! Zentinel ZentinelSec Agent Library
 //!
-//! A pure Rust ModSecurity-compatible WAF agent for Sentinel proxy.
+//! A pure Rust ModSecurity-compatible WAF agent for Zentinel proxy.
 //! Provides full OWASP Core Rule Set (CRS) support without any C dependencies.
 //!
 //! # Example
 //!
 //! ```ignore
-//! use sentinel_agent_sentinelsec::{SentinelSecAgent, SentinelSecConfig};
-//! use sentinel_agent_protocol::v2::GrpcAgentServerV2;
+//! use zentinel_agent_zentinelsec::{ZentinelSecAgent, ZentinelSecConfig};
+//! use zentinel_agent_protocol::v2::GrpcAgentServerV2;
 //!
-//! let config = SentinelSecConfig {
+//! let config = ZentinelSecConfig {
 //!     rules_paths: vec!["/etc/modsecurity/crs/rules/*.conf".to_string()],
 //!     ..Default::default()
 //! };
-//! let agent = SentinelSecAgent::new(config)?;
-//! let server = GrpcAgentServerV2::new("sentinelsec", Box::new(agent));
+//! let agent = ZentinelSecAgent::new(config)?;
+//! let server = GrpcAgentServerV2::new("zentinelsec", Box::new(agent));
 //! server.run("0.0.0.0:50051".parse().unwrap()).await?;
 //! ```
 
@@ -28,20 +28,20 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
-use sentinel_agent_protocol::{
+use zentinel_agent_protocol::{
     AgentResponse, AuditMetadata, EventType, HeaderOp, RequestBodyChunkEvent,
     RequestHeadersEvent, ResponseBodyChunkEvent, ResponseHeadersEvent,
 };
-use sentinel_agent_protocol::v2::{
+use zentinel_agent_protocol::v2::{
     AgentCapabilities, AgentFeatures, AgentHandlerV2, AgentLimits, DrainReason,
     HealthStatus, MetricsReport, ShutdownReason,
 };
 
-use sentinel_modsec::ModSecurity;
+use zentinel_modsec::ModSecurity;
 
-/// SentinelSec configuration
+/// ZentinelSec configuration
 #[derive(Debug, Clone)]
-pub struct SentinelSecConfig {
+pub struct ZentinelSecConfig {
     /// Paths to ModSecurity rule files (glob patterns supported)
     pub rules_paths: Vec<String>,
     /// Block mode (true) or detect-only mode (false)
@@ -56,7 +56,7 @@ pub struct SentinelSecConfig {
     pub response_inspection_enabled: bool,
 }
 
-impl Default for SentinelSecConfig {
+impl Default for ZentinelSecConfig {
     fn default() -> Self {
         Self {
             rules_paths: vec![],
@@ -69,13 +69,13 @@ impl Default for SentinelSecConfig {
     }
 }
 
-/// JSON-serializable configuration for SentinelSec agent
+/// JSON-serializable configuration for ZentinelSec agent
 ///
 /// Used for parsing configuration from the proxy's agent config.
 /// Field names use kebab-case to match YAML/JSON config conventions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct SentinelSecConfigJson {
+pub struct ZentinelSecConfigJson {
     /// Paths to ModSecurity rule files (glob patterns supported)
     #[serde(default)]
     pub rules_paths: Vec<String>,
@@ -108,8 +108,8 @@ fn default_max_body_size() -> usize {
     1048576 // 1MB
 }
 
-impl From<SentinelSecConfigJson> for SentinelSecConfig {
-    fn from(json: SentinelSecConfigJson) -> Self {
+impl From<ZentinelSecConfigJson> for ZentinelSecConfig {
+    fn from(json: ZentinelSecConfigJson) -> Self {
         Self {
             rules_paths: json.rules_paths,
             block_mode: json.block_mode,
@@ -121,7 +121,7 @@ impl From<SentinelSecConfigJson> for SentinelSecConfig {
     }
 }
 
-/// Detection result from SentinelSec
+/// Detection result from ZentinelSec
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Detection {
     /// Rule ID that triggered the detection
@@ -132,16 +132,16 @@ pub struct Detection {
     pub severity: Option<String>,
 }
 
-/// SentinelSec engine wrapper
-pub struct SentinelSecEngine {
+/// ZentinelSec engine wrapper
+pub struct ZentinelSecEngine {
     modsec: ModSecurity,
     /// Agent configuration
-    pub config: SentinelSecConfig,
+    pub config: ZentinelSecConfig,
 }
 
-impl SentinelSecEngine {
-    /// Create a new SentinelSec engine with the given configuration
-    pub fn new(config: SentinelSecConfig) -> Result<Self> {
+impl ZentinelSecEngine {
+    /// Create a new ZentinelSec engine with the given configuration
+    pub fn new(config: ZentinelSecConfig) -> Result<Self> {
         // Build rules string from all rule files
         let mut rules_content = String::new();
 
@@ -179,13 +179,13 @@ impl SentinelSecEngine {
         let modsec = if rules_content.trim().is_empty() || loaded_count == 0 {
             // No rules loaded, create with just SecRuleEngine On
             ModSecurity::from_string("SecRuleEngine On")
-                .map_err(|e| anyhow::anyhow!("Failed to initialize SentinelSec engine: {}", e))?
+                .map_err(|e| anyhow::anyhow!("Failed to initialize ZentinelSec engine: {}", e))?
         } else {
             ModSecurity::from_string(&rules_content)
                 .map_err(|e| anyhow::anyhow!("Failed to parse rules: {}", e))?
         };
 
-        info!(rules_files = loaded_count, rule_count = modsec.rule_count(), "SentinelSec engine initialized");
+        info!(rules_files = loaded_count, rule_count = modsec.rule_count(), "ZentinelSec engine initialized");
 
         Ok(Self { modsec, config })
     }
@@ -215,9 +215,9 @@ struct PendingTransaction {
     client_ip: String,
 }
 
-/// SentinelSec agent
-pub struct SentinelSecAgent {
-    engine: Arc<RwLock<SentinelSecEngine>>,
+/// ZentinelSec agent
+pub struct ZentinelSecAgent {
+    engine: Arc<RwLock<ZentinelSecEngine>>,
     pending_requests: Arc<RwLock<HashMap<String, PendingTransaction>>>,
     /// Metrics tracking
     requests_total: AtomicU64,
@@ -227,10 +227,10 @@ pub struct SentinelSecAgent {
     draining: AtomicU64, // 0 = not draining, >0 = drain end timestamp ms
 }
 
-impl SentinelSecAgent {
-    /// Create a new SentinelSec agent with the given configuration
-    pub fn new(config: SentinelSecConfig) -> Result<Self> {
-        let engine = SentinelSecEngine::new(config)?;
+impl ZentinelSecAgent {
+    /// Create a new ZentinelSec agent with the given configuration
+    pub fn new(config: ZentinelSecConfig) -> Result<Self> {
+        let engine = ZentinelSecEngine::new(config)?;
         Ok(Self {
             engine: Arc::new(RwLock::new(engine)),
             pending_requests: Arc::new(RwLock::new(HashMap::new())),
@@ -256,21 +256,21 @@ impl SentinelSecAgent {
 
     /// Reconfigure the agent with new settings
     ///
-    /// This rebuilds the SentinelSec engine with the new configuration.
+    /// This rebuilds the ZentinelSec engine with the new configuration.
     /// In-flight requests using the old engine will complete normally.
-    pub async fn reconfigure(&self, config: SentinelSecConfig) -> Result<()> {
-        info!("Reconfiguring SentinelSec engine");
-        let new_engine = SentinelSecEngine::new(config)?;
+    pub async fn reconfigure(&self, config: ZentinelSecConfig) -> Result<()> {
+        info!("Reconfiguring ZentinelSec engine");
+        let new_engine = ZentinelSecEngine::new(config)?;
         let mut engine = self.engine.write().await;
         *engine = new_engine;
         // Clear pending requests since rules may have changed
         let mut pending = self.pending_requests.write().await;
         pending.clear();
-        info!("SentinelSec engine reconfigured successfully");
+        info!("ZentinelSec engine reconfigured successfully");
         Ok(())
     }
 
-    /// Process a complete request through SentinelSec
+    /// Process a complete request through ZentinelSec
     async fn process_request(
         &self,
         correlation_id: &str,
@@ -307,10 +307,10 @@ impl SentinelSecAgent {
                 debug!(
                     correlation_id = correlation_id,
                     status = status,
-                    "SentinelSec intervention (headers)"
+                    "ZentinelSec intervention (headers)"
                 );
                 let rule_ids = tx.matched_rules().iter().map(|s| s.to_string()).collect();
-                return Ok(Some((status, "Blocked by SentinelSec".to_string(), rule_ids)));
+                return Ok(Some((status, "Blocked by ZentinelSec".to_string(), rule_ids)));
             }
         }
 
@@ -329,10 +329,10 @@ impl SentinelSecAgent {
                         debug!(
                             correlation_id = correlation_id,
                             status = status,
-                            "SentinelSec intervention (body)"
+                            "ZentinelSec intervention (body)"
                         );
                         let rule_ids = tx.matched_rules().iter().map(|s| s.to_string()).collect();
-                        return Ok(Some((status, "Blocked by SentinelSec".to_string(), rule_ids)));
+                        return Ok(Some((status, "Blocked by ZentinelSec".to_string(), rule_ids)));
                     }
                 }
             }
@@ -343,12 +343,12 @@ impl SentinelSecAgent {
 }
 
 #[async_trait::async_trait]
-impl AgentHandlerV2 for SentinelSecAgent {
+impl AgentHandlerV2 for ZentinelSecAgent {
     /// Return agent capabilities for v2 protocol negotiation
     fn capabilities(&self) -> AgentCapabilities {
         AgentCapabilities::new(
-            "sentinel-sentinelsec",
-            "SentinelSec WAF Agent",
+            "zentinel-zentinelsec",
+            "ZentinelSec WAF Agent",
             env!("CARGO_PKG_VERSION"),
         )
         .with_event(EventType::RequestHeaders)
@@ -379,23 +379,23 @@ impl AgentHandlerV2 for SentinelSecAgent {
     async fn on_configure(&self, config: serde_json::Value, version: Option<String>) -> bool {
         debug!(config_version = ?version, "Received configure event");
 
-        // Parse the JSON config into SentinelSecConfigJson
-        let config_json: SentinelSecConfigJson = match serde_json::from_value(config) {
+        // Parse the JSON config into ZentinelSecConfigJson
+        let config_json: ZentinelSecConfigJson = match serde_json::from_value(config) {
             Ok(config) => config,
             Err(e) => {
-                warn!(error = %e, "Failed to parse SentinelSec configuration");
+                warn!(error = %e, "Failed to parse ZentinelSec configuration");
                 return false;
             }
         };
 
         // Convert to internal config and reconfigure the engine
-        let config: SentinelSecConfig = config_json.into();
+        let config: ZentinelSecConfig = config_json.into();
         if let Err(e) = self.reconfigure(config).await {
-            warn!(error = %e, "Failed to reconfigure SentinelSec engine");
+            warn!(error = %e, "Failed to reconfigure ZentinelSec engine");
             return false;
         }
 
-        info!(config_version = ?version, "SentinelSec agent configured successfully");
+        info!(config_version = ?version, "ZentinelSec agent configured successfully");
         true
     }
 
@@ -409,8 +409,8 @@ impl AgentHandlerV2 for SentinelSecAgent {
                 .unwrap_or(0);
             let eta_ms = if drain_end > now { Some(drain_end - now) } else { None };
             HealthStatus {
-                agent_id: "sentinel-sentinelsec".to_string(),
-                state: sentinel_agent_protocol::v2::HealthState::Draining { eta_ms },
+                agent_id: "zentinel-zentinelsec".to_string(),
+                state: zentinel_agent_protocol::v2::HealthState::Draining { eta_ms },
                 message: Some("Agent is draining".to_string()),
                 load: None,
                 resources: None,
@@ -418,26 +418,26 @@ impl AgentHandlerV2 for SentinelSecAgent {
                 timestamp_ms: now,
             }
         } else {
-            HealthStatus::healthy("sentinel-sentinelsec")
+            HealthStatus::healthy("zentinel-zentinelsec")
         }
     }
 
     /// Return metrics report for v2 protocol
     fn metrics_report(&self) -> Option<MetricsReport> {
-        use sentinel_agent_protocol::v2::{CounterMetric, GaugeMetric};
+        use zentinel_agent_protocol::v2::{CounterMetric, GaugeMetric};
 
-        let mut report = MetricsReport::new("sentinel-sentinelsec", 10_000);
+        let mut report = MetricsReport::new("zentinel-zentinelsec", 10_000);
 
         report.counters.push(CounterMetric::new(
-            "sentinelsec_requests_total",
+            "zentinelsec_requests_total",
             self.requests_total.load(Ordering::Relaxed),
         ));
         report.counters.push(CounterMetric::new(
-            "sentinelsec_requests_blocked",
+            "zentinelsec_requests_blocked",
             self.requests_blocked.load(Ordering::Relaxed),
         ));
         report.counters.push(CounterMetric::new(
-            "sentinelsec_requests_allowed",
+            "zentinelsec_requests_allowed",
             self.requests_allowed.load(Ordering::Relaxed),
         ));
 
@@ -450,7 +450,7 @@ impl AgentHandlerV2 for SentinelSecAgent {
                 .unwrap_or(0.0)
         };
         report.gauges.push(GaugeMetric::new(
-            "sentinelsec_pending_requests",
+            "zentinelsec_pending_requests",
             pending_count,
         ));
 
@@ -492,7 +492,7 @@ impl AgentHandlerV2 for SentinelSecAgent {
         {
             let engine = self.engine.read().await;
             if engine.is_excluded(path) {
-                debug!(path = path, "Path excluded from SentinelSec");
+                debug!(path = path, "Path excluded from ZentinelSec");
                 return AgentResponse::default_allow();
             }
         }
@@ -517,7 +517,7 @@ impl AgentHandlerV2 for SentinelSecAgent {
                         correlation_id = correlation_id,
                         status = status,
                         rules = ?rule_ids,
-                        "Request blocked by SentinelSec"
+                        "Request blocked by ZentinelSec"
                     );
                     let rule_id = rule_ids.first().cloned().unwrap_or_default();
                     AgentResponse::block(status, Some("Forbidden".to_string()))
@@ -534,7 +534,7 @@ impl AgentHandlerV2 for SentinelSecAgent {
                             value: message.clone(),
                         })
                         .with_audit(AuditMetadata {
-                            tags: vec!["sentinelsec".to_string(), "blocked".to_string()],
+                            tags: vec!["zentinelsec".to_string(), "blocked".to_string()],
                             rule_ids,
                             reason_codes: vec![message],
                             ..Default::default()
@@ -544,7 +544,7 @@ impl AgentHandlerV2 for SentinelSecAgent {
                     info!(
                         correlation_id = correlation_id,
                         rules = ?rule_ids,
-                        "SentinelSec detection (detect-only mode)"
+                        "ZentinelSec detection (detect-only mode)"
                     );
                     AgentResponse::default_allow()
                         .add_request_header(HeaderOp::Set {
@@ -552,7 +552,7 @@ impl AgentHandlerV2 for SentinelSecAgent {
                             value: message.clone(),
                         })
                         .with_audit(AuditMetadata {
-                            tags: vec!["sentinelsec".to_string(), "detected".to_string()],
+                            tags: vec!["zentinelsec".to_string(), "detected".to_string()],
                             rule_ids,
                             reason_codes: vec![message],
                             ..Default::default()
@@ -580,7 +580,7 @@ impl AgentHandlerV2 for SentinelSecAgent {
             }
             Err(e) => {
                 self.requests_allowed.fetch_add(1, Ordering::Relaxed);
-                warn!(error = %e, "SentinelSec processing error");
+                warn!(error = %e, "ZentinelSec processing error");
                 AgentResponse::default_allow()
             }
         }
@@ -664,7 +664,7 @@ impl AgentHandlerV2 for SentinelSecAgent {
                                 correlation_id = correlation_id,
                                 status = status,
                                 rules = ?rule_ids,
-                                "Request blocked by SentinelSec (body inspection)"
+                                "Request blocked by ZentinelSec (body inspection)"
                             );
                             let rule_id = rule_ids.first().cloned().unwrap_or_default();
                             return AgentResponse::block(status, Some("Forbidden".to_string()))
@@ -682,7 +682,7 @@ impl AgentHandlerV2 for SentinelSecAgent {
                                 })
                                 .with_audit(AuditMetadata {
                                     tags: vec![
-                                        "sentinelsec".to_string(),
+                                        "zentinelsec".to_string(),
                                         "blocked".to_string(),
                                         "body".to_string(),
                                     ],
@@ -694,7 +694,7 @@ impl AgentHandlerV2 for SentinelSecAgent {
                             info!(
                                 correlation_id = correlation_id,
                                 rules = ?rule_ids,
-                                "SentinelSec detection in body (detect-only mode)"
+                                "ZentinelSec detection in body (detect-only mode)"
                             );
                             return AgentResponse::default_allow()
                                 .add_request_header(HeaderOp::Set {
@@ -703,7 +703,7 @@ impl AgentHandlerV2 for SentinelSecAgent {
                                 })
                                 .with_audit(AuditMetadata {
                                     tags: vec![
-                                        "sentinelsec".to_string(),
+                                        "zentinelsec".to_string(),
                                         "detected".to_string(),
                                         "body".to_string(),
                                     ],
@@ -715,7 +715,7 @@ impl AgentHandlerV2 for SentinelSecAgent {
                     }
                     Ok(None) => {}
                     Err(e) => {
-                        warn!(error = %e, "SentinelSec body processing error");
+                        warn!(error = %e, "ZentinelSec body processing error");
                     }
                 }
             }
@@ -737,7 +737,7 @@ mod tests {
 
     #[test]
     fn test_default_config() {
-        let config = SentinelSecConfig::default();
+        let config = ZentinelSecConfig::default();
         assert!(config.rules_paths.is_empty());
         assert!(config.block_mode);
         assert!(config.body_inspection_enabled);
@@ -747,16 +747,16 @@ mod tests {
 
     #[test]
     fn test_engine_initialization() {
-        let config = SentinelSecConfig::default();
-        let engine = SentinelSecEngine::new(config);
+        let config = ZentinelSecConfig::default();
+        let engine = ZentinelSecEngine::new(config);
         assert!(engine.is_ok());
     }
 
     #[test]
     fn test_engine_with_inline_rule() {
         // Test with a simple inline rule
-        let config = SentinelSecConfig::default();
-        let engine = SentinelSecEngine::new(config).unwrap();
+        let config = ZentinelSecConfig::default();
+        let engine = ZentinelSecEngine::new(config).unwrap();
 
         // Verify engine is working
         let mut tx = engine.modsec.new_transaction();
@@ -769,11 +769,11 @@ mod tests {
 
     #[test]
     fn test_path_exclusion() {
-        let config = SentinelSecConfig {
+        let config = ZentinelSecConfig {
             exclude_paths: vec!["/health".to_string(), "/metrics".to_string()],
             ..Default::default()
         };
-        let engine = SentinelSecEngine::new(config).unwrap();
+        let engine = ZentinelSecEngine::new(config).unwrap();
 
         assert!(engine.is_excluded("/health"));
         assert!(engine.is_excluded("/health/live"));
@@ -791,7 +791,7 @@ mod tests {
             SecRule REQUEST_URI "@contains union select" "id:942102,phase:1,deny,status:403,msg:'UNION SELECT detected'"
         "#;
 
-        let modsec = sentinel_modsec::ModSecurity::from_string(rules).unwrap();
+        let modsec = zentinel_modsec::ModSecurity::from_string(rules).unwrap();
 
         // Test 1: Classic SQL injection in query string
         let mut tx = modsec.new_transaction();
@@ -840,7 +840,7 @@ mod tests {
             SecRule REQUEST_URI "@contains <script" "id:941102,phase:1,deny,status:403,msg:'Script tag detected'"
         "#;
 
-        let modsec = sentinel_modsec::ModSecurity::from_string(rules).unwrap();
+        let modsec = zentinel_modsec::ModSecurity::from_string(rules).unwrap();
 
         // Test 1: Script tag injection
         let mut tx = modsec.new_transaction();
@@ -888,7 +888,7 @@ mod tests {
             SecRule ARGS "@detectSQLi" "id:942200,phase:2,deny,status:403,msg:'SQL Injection in Body'"
         "#;
 
-        let modsec = sentinel_modsec::ModSecurity::from_string(rules).unwrap();
+        let modsec = zentinel_modsec::ModSecurity::from_string(rules).unwrap();
 
         let mut tx = modsec.new_transaction();
         tx.process_uri("/api/login", "POST", "HTTP/1.1").unwrap();

@@ -13,7 +13,7 @@ fn crs_available() -> bool {
     Path::new("test-rules/crs/crs-setup.conf").exists()
 }
 
-fn load_crs() -> sentinel_modsec::ModSecurity {
+fn load_crs() -> zentinel_modsec::ModSecurity {
     // Load CRS setup first, then specific rule files
     let mut rules_content = String::new();
 
@@ -45,7 +45,7 @@ fn load_crs() -> sentinel_modsec::ModSecurity {
         }
     }
 
-    sentinel_modsec::ModSecurity::from_string(&rules_content)
+    zentinel_modsec::ModSecurity::from_string(&rules_content)
         .expect("Failed to parse CRS rules")
 }
 

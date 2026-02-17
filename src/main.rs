@@ -1,19 +1,19 @@
-//! Sentinel SentinelSec Agent CLI
+//! Zentinel ZentinelSec Agent CLI
 //!
 //! Command-line interface for the pure Rust ModSecurity-compatible WAF agent.
-//! Uses gRPC transport with Agent Protocol v2 for communication with Sentinel proxy.
+//! Uses gRPC transport with Agent Protocol v2 for communication with Zentinel proxy.
 
 use anyhow::Result;
 use clap::Parser;
 use tracing::info;
 
-use sentinel_agent_sentinelsec::{SentinelSecAgent, SentinelSecConfig};
-use sentinel_agent_protocol::v2::GrpcAgentServerV2;
+use zentinel_agent_zentinelsec::{ZentinelSecAgent, ZentinelSecConfig};
+use zentinel_agent_protocol::v2::GrpcAgentServerV2;
 
 /// Command line arguments
 #[derive(Parser, Debug)]
-#[command(name = "sentinel-sentinelsec-agent")]
-#[command(about = "Pure Rust ModSecurity-compatible WAF agent for Sentinel - full OWASP CRS support without C dependencies")]
+#[command(name = "zentinel-zentinelsec-agent")]
+#[command(about = "Pure Rust ModSecurity-compatible WAF agent for Zentinel - full OWASP CRS support without C dependencies")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 struct Args {
     /// gRPC server address (default: "0.0.0.0:50051")
@@ -21,43 +21,43 @@ struct Args {
     grpc_address: String,
 
     /// Paths to ModSecurity rule files (can be specified multiple times, supports glob patterns)
-    #[arg(long = "rules", env = "SENTINELSEC_RULES", value_delimiter = ',')]
+    #[arg(long = "rules", env = "ZENTINELSEC_RULES", value_delimiter = ',')]
     rules_paths: Vec<String>,
 
     /// Block mode (true) or detect-only mode (false)
-    #[arg(long, default_value = "true", env = "SENTINELSEC_BLOCK_MODE")]
+    #[arg(long, default_value = "true", env = "ZENTINELSEC_BLOCK_MODE")]
     block_mode: bool,
 
     /// Paths to exclude from inspection (comma-separated)
-    #[arg(long, env = "SENTINELSEC_EXCLUDE_PATHS")]
+    #[arg(long, env = "ZENTINELSEC_EXCLUDE_PATHS")]
     exclude_paths: Option<String>,
 
     /// Enable request body inspection
-    #[arg(long, default_value = "true", env = "SENTINELSEC_BODY_INSPECTION")]
+    #[arg(long, default_value = "true", env = "ZENTINELSEC_BODY_INSPECTION")]
     body_inspection: bool,
 
     /// Maximum body size to inspect in bytes (default 1MB)
-    #[arg(long, default_value = "1048576", env = "SENTINELSEC_MAX_BODY_SIZE")]
+    #[arg(long, default_value = "1048576", env = "ZENTINELSEC_MAX_BODY_SIZE")]
     max_body_size: usize,
 
     /// Enable response body inspection
-    #[arg(long, default_value = "false", env = "SENTINELSEC_RESPONSE_INSPECTION")]
+    #[arg(long, default_value = "false", env = "ZENTINELSEC_RESPONSE_INSPECTION")]
     response_inspection: bool,
 
     /// Enable verbose logging
-    #[arg(short, long, env = "SENTINELSEC_VERBOSE")]
+    #[arg(short, long, env = "ZENTINELSEC_VERBOSE")]
     verbose: bool,
 }
 
 impl Args {
-    fn to_config(&self) -> SentinelSecConfig {
+    fn to_config(&self) -> ZentinelSecConfig {
         let exclude_paths = self
             .exclude_paths
             .as_ref()
             .map(|p| p.split(',').map(|s| s.trim().to_string()).collect())
             .unwrap_or_default();
 
-        SentinelSecConfig {
+        ZentinelSecConfig {
             rules_paths: self.rules_paths.clone(),
             block_mode: self.block_mode,
             exclude_paths,
@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
     let log_level = if args.verbose { "debug" } else { "info" };
     tracing_subscriber::fmt()
         .with_env_filter(format!(
-            "{}={},sentinel_agent_protocol=info",
+            "{}={},zentinel_agent_protocol=info",
             env!("CARGO_CRATE_NAME"),
             log_level
         ))
@@ -87,7 +87,7 @@ async fn main() -> Result<()> {
     info!(
         version = env!("CARGO_PKG_VERSION"),
         protocol = "v2",
-        "Starting Sentinel SentinelSec Agent (pure Rust ModSecurity)"
+        "Starting Zentinel ZentinelSec Agent (pure Rust ModSecurity)"
     );
 
     // Build configuration
@@ -103,14 +103,14 @@ async fn main() -> Result<()> {
     );
 
     if config.rules_paths.is_empty() {
-        tracing::warn!("No rules paths configured - SentinelSec will not block any requests");
+        tracing::warn!("No rules paths configured - ZentinelSec will not block any requests");
         tracing::warn!(
             "Use --rules to specify rule files, e.g.: --rules /etc/modsecurity/crs/rules/*.conf"
         );
     }
 
     // Create agent
-    let agent = SentinelSecAgent::new(config)?;
+    let agent = ZentinelSecAgent::new(config)?;
 
     // Start agent server using gRPC transport (v2 protocol)
     let addr: std::net::SocketAddr = args.grpc_address
@@ -124,7 +124,7 @@ async fn main() -> Result<()> {
         "Starting gRPC agent server"
     );
 
-    let server = GrpcAgentServerV2::new("sentinel-sentinelsec", Box::new(agent));
+    let server = GrpcAgentServerV2::new("zentinel-zentinelsec", Box::new(agent));
     server.run(addr).await.map_err(|e| anyhow::anyhow!("{}", e))?;
 
     Ok(())

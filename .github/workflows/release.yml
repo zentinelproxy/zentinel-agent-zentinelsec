@@ -13,7 +13,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  BINARY_NAME: sentinel-sentinelsec-agent
+  BINARY_NAME: zentinel-zentinelsec-agent
 
 jobs:
   build:
@@ -43,8 +43,8 @@ jobs:
       - name: Checkout SDK
         uses: actions/checkout@v4
         with:
-          repository: raskell-io/sentinel-agent-rust-sdk
-          path: sentinel-agent-rust-sdk
+          repository: zentinelproxy/zentinel-agent-rust-sdk
+          path: zentinel-agent-rust-sdk
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
