@@ -23,11 +23,11 @@ path = "src/main.rs"
 
 [dependencies]
 # Zentinel protocol
-zentinel-agent-protocol = { version = "0.5", git = "https://github.com/zentinelproxy/zentinel.git", package = "zentinel-agent-protocol" }
-zentinel-common = { version = "0.5", git = "https://github.com/zentinelproxy/zentinel.git", package = "zentinel-common" }
+zentinel-agent-protocol = "0.5"
+zentinel-common = "0.5"
 
 # Pure Rust ModSecurity implementation
-zentinel-modsec = { version = "0.1", git = "https://github.com/zentinelproxy/zentinel-modsec.git" }
+zentinel-modsec = "0.1"
 
 # Async runtime
 tokio = { version = "1.40", features = ["full"] }
