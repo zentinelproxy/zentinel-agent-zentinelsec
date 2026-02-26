@@ -7,13 +7,15 @@ use anyhow::Result;
 use clap::Parser;
 use tracing::info;
 
-use zentinel_agent_zentinelsec::{ZentinelSecAgent, ZentinelSecConfig};
 use zentinel_agent_protocol::v2::GrpcAgentServerV2;
+use zentinel_agent_zentinelsec::{ZentinelSecAgent, ZentinelSecConfig};
 
 /// Command line arguments
 #[derive(Parser, Debug)]
 #[command(name = "zentinel-zentinelsec-agent")]
-#[command(about = "Pure Rust ModSecurity-compatible WAF agent for Zentinel - full OWASP CRS support without C dependencies")]
+#[command(
+    about = "Pure Rust ModSecurity-compatible WAF agent for Zentinel - full OWASP CRS support without C dependencies"
+)]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 struct Args {
     /// gRPC server address (default: "0.0.0.0:50051")
@@ -113,7 +115,8 @@ async fn main() -> Result<()> {
     let agent = ZentinelSecAgent::new(config)?;
 
     // Start agent server using gRPC transport (v2 protocol)
-    let addr: std::net::SocketAddr = args.grpc_address
+    let addr: std::net::SocketAddr = args
+        .grpc_address
         .parse()
         .map_err(|e| anyhow::anyhow!("Invalid gRPC address '{}': {}", args.grpc_address, e))?;
 
@@ -125,7 +128,10 @@ async fn main() -> Result<()> {
     );
 
     let server = GrpcAgentServerV2::new("zentinel-zentinelsec", Box::new(agent));
-    server.run(addr).await.map_err(|e| anyhow::anyhow!("{}", e))?;
+    server
+        .run(addr)
+        .await
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
 
     Ok(())
 }

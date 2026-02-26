@@ -38,15 +38,14 @@ fn load_crs() -> zentinel_modsec::ModSecurity {
 
     for path in &rule_files {
         if Path::new(path).exists() {
-            let content = std::fs::read_to_string(path)
-                .unwrap_or_else(|_| panic!("Failed to read {}", path));
+            let content =
+                std::fs::read_to_string(path).unwrap_or_else(|_| panic!("Failed to read {}", path));
             rules_content.push_str(&content);
             rules_content.push('\n');
         }
     }
 
-    zentinel_modsec::ModSecurity::from_string(&rules_content)
-        .expect("Failed to parse CRS rules")
+    zentinel_modsec::ModSecurity::from_string(&rules_content).expect("Failed to parse CRS rules")
 }
 
 #[test]
@@ -88,17 +87,24 @@ fn test_crs_sql_injection_942100() {
         tx.add_request_header("Host", "example.com").unwrap();
         tx.process_request_headers().unwrap();
 
-        let blocked = tx.intervention().map(|i| i.status != 0 && i.status != 200).unwrap_or(false);
+        let blocked = tx
+            .intervention()
+            .map(|i| i.status != 0 && i.status != 200)
+            .unwrap_or(false);
         let rule_ids: Vec<_> = tx.matched_rules().to_vec();
 
-        println!("  {} => {} {:?}",
+        println!(
+            "  {} => {} {:?}",
             payload,
             if blocked { "BLOCKED" } else { "allowed" },
             rule_ids
         );
 
-        assert!(blocked || !rule_ids.is_empty(),
-            "Expected SQLi to be detected: {}", payload);
+        assert!(
+            blocked || !rule_ids.is_empty(),
+            "Expected SQLi to be detected: {}",
+            payload
+        );
     }
 }
 
@@ -127,17 +133,24 @@ fn test_crs_xss_941100() {
         tx.add_request_header("Host", "example.com").unwrap();
         tx.process_request_headers().unwrap();
 
-        let blocked = tx.intervention().map(|i| i.status != 0 && i.status != 200).unwrap_or(false);
+        let blocked = tx
+            .intervention()
+            .map(|i| i.status != 0 && i.status != 200)
+            .unwrap_or(false);
         let rule_ids: Vec<_> = tx.matched_rules().to_vec();
 
-        println!("  {} => {} {:?}",
+        println!(
+            "  {} => {} {:?}",
             payload,
             if blocked { "BLOCKED" } else { "allowed" },
             rule_ids
         );
 
-        assert!(blocked || !rule_ids.is_empty(),
-            "Expected XSS to be detected: {}", payload);
+        assert!(
+            blocked || !rule_ids.is_empty(),
+            "Expected XSS to be detected: {}",
+            payload
+        );
     }
 }
 
@@ -165,17 +178,24 @@ fn test_crs_path_traversal_930100() {
         tx.add_request_header("Host", "example.com").unwrap();
         tx.process_request_headers().unwrap();
 
-        let blocked = tx.intervention().map(|i| i.status != 0 && i.status != 200).unwrap_or(false);
+        let blocked = tx
+            .intervention()
+            .map(|i| i.status != 0 && i.status != 200)
+            .unwrap_or(false);
         let rule_ids: Vec<_> = tx.matched_rules().to_vec();
 
-        println!("  {} => {} {:?}",
+        println!(
+            "  {} => {} {:?}",
             payload,
             if blocked { "BLOCKED" } else { "allowed" },
             rule_ids
         );
 
-        assert!(blocked || !rule_ids.is_empty(),
-            "Expected LFI to be detected: {}", payload);
+        assert!(
+            blocked || !rule_ids.is_empty(),
+            "Expected LFI to be detected: {}",
+            payload
+        );
     }
 }
 
@@ -203,17 +223,24 @@ fn test_crs_command_injection_932100() {
         tx.add_request_header("Host", "example.com").unwrap();
         tx.process_request_headers().unwrap();
 
-        let blocked = tx.intervention().map(|i| i.status != 0 && i.status != 200).unwrap_or(false);
+        let blocked = tx
+            .intervention()
+            .map(|i| i.status != 0 && i.status != 200)
+            .unwrap_or(false);
         let rule_ids: Vec<_> = tx.matched_rules().to_vec();
 
-        println!("  {} => {} {:?}",
+        println!(
+            "  {} => {} {:?}",
             payload,
             if blocked { "BLOCKED" } else { "allowed" },
             rule_ids
         );
 
-        assert!(blocked || !rule_ids.is_empty(),
-            "Expected RCE to be detected: {}", payload);
+        assert!(
+            blocked || !rule_ids.is_empty(),
+            "Expected RCE to be detected: {}",
+            payload
+        );
     }
 }
 
@@ -244,18 +271,26 @@ fn test_crs_clean_requests_pass() {
         tx.add_request_header("User-Agent", "Mozilla/5.0").unwrap();
         tx.process_request_headers().unwrap();
 
-        let blocked = tx.intervention().map(|i| i.status != 0 && i.status != 200).unwrap_or(false);
+        let blocked = tx
+            .intervention()
+            .map(|i| i.status != 0 && i.status != 200)
+            .unwrap_or(false);
         let rule_ids: Vec<_> = tx.matched_rules().to_vec();
 
-        println!("  {} {} => {} {:?}",
-            method, path,
+        println!(
+            "  {} {} => {} {:?}",
+            method,
+            path,
             if blocked { "BLOCKED" } else { "allowed" },
             rule_ids
         );
 
         // Clean requests should not be blocked
-        assert!(!blocked,
-            "Clean request should not be blocked: {} {}", method, path);
+        assert!(
+            !blocked,
+            "Clean request should not be blocked: {} {}",
+            method, path
+        );
     }
 }
 
@@ -273,7 +308,8 @@ fn test_crs_post_body_sqli() {
     let mut tx = modsec.new_transaction();
     tx.process_uri("/api/login", "POST", "HTTP/1.1").unwrap();
     tx.add_request_header("Host", "example.com").unwrap();
-    tx.add_request_header("Content-Type", "application/x-www-form-urlencoded").unwrap();
+    tx.add_request_header("Content-Type", "application/x-www-form-urlencoded")
+        .unwrap();
     tx.process_request_headers().unwrap();
 
     // Add SQL injection in POST body
@@ -281,14 +317,20 @@ fn test_crs_post_body_sqli() {
     tx.append_request_body(body).unwrap();
     tx.process_request_body().unwrap();
 
-    let blocked = tx.intervention().map(|i| i.status != 0 && i.status != 200).unwrap_or(false);
+    let blocked = tx
+        .intervention()
+        .map(|i| i.status != 0 && i.status != 200)
+        .unwrap_or(false);
     let rule_ids: Vec<_> = tx.matched_rules().to_vec();
 
-    println!("  POST body SQLi => {} {:?}",
+    println!(
+        "  POST body SQLi => {} {:?}",
         if blocked { "BLOCKED" } else { "allowed" },
         rule_ids
     );
 
-    assert!(blocked || !rule_ids.is_empty(),
-        "Expected POST body SQLi to be detected");
+    assert!(
+        blocked || !rule_ids.is_empty(),
+        "Expected POST body SQLi to be detected"
+    );
 }

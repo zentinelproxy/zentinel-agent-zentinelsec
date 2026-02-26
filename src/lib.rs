@@ -28,13 +28,13 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
-use zentinel_agent_protocol::{
-    AgentResponse, AuditMetadata, EventType, HeaderOp, RequestBodyChunkEvent,
-    RequestHeadersEvent, ResponseBodyChunkEvent, ResponseHeadersEvent,
-};
 use zentinel_agent_protocol::v2::{
-    AgentCapabilities, AgentFeatures, AgentHandlerV2, AgentLimits, DrainReason,
-    HealthStatus, MetricsReport, ShutdownReason,
+    AgentCapabilities, AgentFeatures, AgentHandlerV2, AgentLimits, DrainReason, HealthStatus,
+    MetricsReport, ShutdownReason,
+};
+use zentinel_agent_protocol::{
+    AgentResponse, AuditMetadata, EventType, HeaderOp, RequestBodyChunkEvent, RequestHeadersEvent,
+    ResponseBodyChunkEvent, ResponseHeadersEvent,
 };
 
 use zentinel_modsec::ModSecurity;
@@ -185,7 +185,11 @@ impl ZentinelSecEngine {
                 .map_err(|e| anyhow::anyhow!("Failed to parse rules: {}", e))?
         };
 
-        info!(rules_files = loaded_count, rule_count = modsec.rule_count(), "ZentinelSec engine initialized");
+        info!(
+            rules_files = loaded_count,
+            rule_count = modsec.rule_count(),
+            "ZentinelSec engine initialized"
+        );
 
         Ok(Self { modsec, config })
     }
@@ -310,7 +314,11 @@ impl ZentinelSecAgent {
                     "ZentinelSec intervention (headers)"
                 );
                 let rule_ids = tx.matched_rules().iter().map(|s| s.to_string()).collect();
-                return Ok(Some((status, "Blocked by ZentinelSec".to_string(), rule_ids)));
+                return Ok(Some((
+                    status,
+                    "Blocked by ZentinelSec".to_string(),
+                    rule_ids,
+                )));
             }
         }
 
@@ -332,7 +340,11 @@ impl ZentinelSecAgent {
                             "ZentinelSec intervention (body)"
                         );
                         let rule_ids = tx.matched_rules().iter().map(|s| s.to_string()).collect();
-                        return Ok(Some((status, "Blocked by ZentinelSec".to_string(), rule_ids)));
+                        return Ok(Some((
+                            status,
+                            "Blocked by ZentinelSec".to_string(),
+                            rule_ids,
+                        )));
                     }
                 }
             }
@@ -407,7 +419,11 @@ impl AgentHandlerV2 for ZentinelSecAgent {
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis() as u64)
                 .unwrap_or(0);
-            let eta_ms = if drain_end > now { Some(drain_end - now) } else { None };
+            let eta_ms = if drain_end > now {
+                Some(drain_end - now)
+            } else {
+                None
+            };
             HealthStatus {
                 agent_id: "zentinel-zentinelsec".to_string(),
                 state: zentinel_agent_protocol::v2::HealthState::Draining { eta_ms },
@@ -795,7 +811,8 @@ mod tests {
 
         // Test 1: Classic SQL injection in query string
         let mut tx = modsec.new_transaction();
-        tx.process_uri("/api/users?id=1' OR '1'='1", "GET", "HTTP/1.1").unwrap();
+        tx.process_uri("/api/users?id=1' OR '1'='1", "GET", "HTTP/1.1")
+            .unwrap();
         tx.process_request_headers().unwrap();
 
         let intervention = tx.intervention();
@@ -810,7 +827,12 @@ mod tests {
 
         // Test 2: UNION-based SQL injection
         let mut tx2 = modsec.new_transaction();
-        tx2.process_uri("/api/users?id=1 union select * from users--", "GET", "HTTP/1.1").unwrap();
+        tx2.process_uri(
+            "/api/users?id=1 union select * from users--",
+            "GET",
+            "HTTP/1.1",
+        )
+        .unwrap();
         tx2.process_request_headers().unwrap();
 
         let intervention2 = tx2.intervention();
@@ -821,7 +843,8 @@ mod tests {
 
         // Test 3: Clean request should pass
         let mut tx3 = modsec.new_transaction();
-        tx3.process_uri("/api/users?id=123", "GET", "HTTP/1.1").unwrap();
+        tx3.process_uri("/api/users?id=123", "GET", "HTTP/1.1")
+            .unwrap();
         tx3.process_request_headers().unwrap();
 
         assert!(
@@ -844,7 +867,8 @@ mod tests {
 
         // Test 1: Script tag injection
         let mut tx = modsec.new_transaction();
-        tx.process_uri("/search?q=<script>alert(1)</script>", "GET", "HTTP/1.1").unwrap();
+        tx.process_uri("/search?q=<script>alert(1)</script>", "GET", "HTTP/1.1")
+            .unwrap();
         tx.process_request_headers().unwrap();
 
         let intervention = tx.intervention();
@@ -859,7 +883,8 @@ mod tests {
 
         // Test 2: Event handler injection
         let mut tx2 = modsec.new_transaction();
-        tx2.process_uri("/search?q=<img src=x onerror=alert(1)>", "GET", "HTTP/1.1").unwrap();
+        tx2.process_uri("/search?q=<img src=x onerror=alert(1)>", "GET", "HTTP/1.1")
+            .unwrap();
         tx2.process_request_headers().unwrap();
 
         let intervention2 = tx2.intervention();
@@ -870,7 +895,8 @@ mod tests {
 
         // Test 3: Clean request should pass
         let mut tx3 = modsec.new_transaction();
-        tx3.process_uri("/search?q=hello+world", "GET", "HTTP/1.1").unwrap();
+        tx3.process_uri("/search?q=hello+world", "GET", "HTTP/1.1")
+            .unwrap();
         tx3.process_request_headers().unwrap();
 
         assert!(
@@ -892,7 +918,8 @@ mod tests {
 
         let mut tx = modsec.new_transaction();
         tx.process_uri("/api/login", "POST", "HTTP/1.1").unwrap();
-        tx.add_request_header("Content-Type", "application/x-www-form-urlencoded").unwrap();
+        tx.add_request_header("Content-Type", "application/x-www-form-urlencoded")
+            .unwrap();
         tx.process_request_headers().unwrap();
 
         // Add malicious body
