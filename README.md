@@ -47,8 +47,8 @@ pairs naming the rule IDs that must or must not fire — on every push.
 
 | | |
 |---|---|
-| Corpus | CRS `main` (4.30.0-dev), 5,033 runnable cases |
-| Passing | **4,608 (91.6%)** |
+| Corpus | CRS `main` (4.31.0-dev), 5,184 runnable cases |
+| Passing | **4,806 (92.7%)** |
 
 That corpus runs in `DetectionOnly` at paranoia level 4, which is how CRS
 documents it. It measures whether individual rules **match**; it does not
@@ -63,9 +63,16 @@ configuration — `crs_does_not_block_ordinary_traffic` and `crs_detects_attacks
 in `tests/crs_integration.rs` assert that ordinary requests pass and attacks are
 blocked, against a real CRS checkout.
 
-> **Upgrade if you are on 0.3.x.** Versions of `zentinel-modsec` before 0.4.0
-> deny **every** request under stock CRS, `GET /` included, because CRS 920100
-> tests an unimplemented `REQUEST_LINE` with a negated regex
+> **Upgrade from builds on `zentinel-modsec` 0.4.x.** 0.4.0 ran only the last
+> `setvar` of each rule, so CRS anomaly scores were dropped: an SQLi that only
+> libinjection (942100) catches was detected and let through
+> ([zentinel-modsec#47](https://github.com/zentinelproxy/zentinel-modsec/issues/47)).
+> It also loaded nothing past the first line of a rule file with CRLF line
+> endings ([#44](https://github.com/zentinelproxy/zentinel-modsec/pull/44)).
+>
+> Versions of `zentinel-modsec` before 0.4.0 deny **every** request under stock
+> CRS, `GET /` included, because CRS 920100 tests an unimplemented
+> `REQUEST_LINE` with a negated regex
 > ([zentinel-modsec#29](https://github.com/zentinelproxy/zentinel-modsec/issues/29)).
 > They also miss payloads that encode spaces as `+`, or that percent-encode the
 > `=` in a form body ([#34](https://github.com/zentinelproxy/zentinel-modsec/issues/34),

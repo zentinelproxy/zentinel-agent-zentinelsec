@@ -163,6 +163,15 @@ fn crs_detects_attacks() {
             "/s?q=%3Cscript%3Ealert(1)%3C/script%3E",
             b"",
         ),
+        (
+            // Matched only by 942100 (libinjection). Before zentinel-modsec
+            // 0.5.0 that rule kept only its last setvar, so its anomaly score
+            // was dropped and this request passed (zentinel-modsec#47).
+            "SQLi seen only by libinjection",
+            "GET",
+            "/u?id=1%27%20OR%20%271%27=%271",
+            b"",
+        ),
         ("LFI in query", "GET", "/f?p=../../../../etc/passwd", b""),
         (
             "RCE in body",

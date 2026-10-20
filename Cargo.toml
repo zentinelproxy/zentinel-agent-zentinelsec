@@ -27,10 +27,10 @@ zentinel-agent-protocol = "0.6"
 zentinel-common = "0.5"
 
 # Pure Rust ModSecurity implementation
-# >= 0.4.0 required: 0.3.0 and earlier deny every request under stock OWASP CRS,
-# because CRS 920100 tests an unimplemented REQUEST_LINE with a negated regex.
-# See zentinel-modsec#29.
-zentinel-modsec = "0.4.0"
+# >= 0.5.0 required. 0.4.0 kept only the last setvar of a rule, so CRS anomaly
+# scores were dropped and some detected attacks passed (zentinel-modsec#47).
+# 0.3.0 and earlier deny every request under stock CRS (zentinel-modsec#29).
+zentinel-modsec = "0.5.0"
 
 # Async runtime
 tokio = { version = "1.40", features = ["full"] }
