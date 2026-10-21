@@ -1,113 +1,165 @@
-# zentinel-agent-zentinelsec
+<p align="center">
+  <a href="https://zentinelproxy.io">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/zentinelproxy/design/main/marks/lockup/zentinel-lockup-dark.svg">
+      <img alt="Zentinel" src="https://raw.githubusercontent.com/zentinelproxy/design/main/marks/lockup/zentinel-lockup-light.svg" height="52">
+    </picture>
+  </a>
+</p>
 
-A pure Rust ModSecurity-compatible WAF agent for [Zentinel](https://github.com/zentinelproxy/zentinel) reverse proxy. Loads the OWASP Core Rule Set with **zero C dependencies** - no libmodsecurity required.
+<h3 align="center">ZentinelSec agent</h3>
 
-> **CRS compatibility is measured, not assumed.** Detection comes from the
-> [zentinel-modsec](https://github.com/zentinelproxy/zentinel-modsec) engine, a
-> pure Rust reimplementation of libmodsecurity, which is run against the OWASP
-> CRS regression suite on every push. See
-> [CRS conformance](#crs-conformance) for the current number and the known gaps
-> before deploying this in blocking mode.
+<p align="center">Runs ModSecurity rules, including the stock OWASP Core Rule Set, on request headers and bodies with a pure-Rust engine and no C dependencies.</p>
 
-## Features
+<p align="center">
+  <a href="https://github.com/zentinelproxy/zentinel-agent-zentinelsec/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/zentinelproxy/zentinel-agent-zentinelsec/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Rust: 1.94.1+" src="https://img.shields.io/badge/rust-1.94.1%2B-f68d31?style=flat&labelColor=1f161e&logo=rust&logoColor=white">
+  <img alt="Agent protocol: v2" src="https://img.shields.io/badge/agent%20protocol-v2-f68d31?style=flat&labelColor=1f161e">
+</p>
 
-- **Loads the stock OWASP CRS**: all 703 rules of CRS 4.30 parse and execute; see [CRS conformance](#crs-conformance)
-- **Pure Rust Implementation**: No libmodsecurity or C dependencies
-- **Built-in SQLi/XSS Detection**: Native `@detectSQLi` and `@detectXSS` operators
-- **SecLang Support**: Load standard ModSecurity rule files
-- **Request Body Inspection**: JSON, form data, XML, and all content types
-- **Response Body Inspection**: Detect data leakage (opt-in)
-- **Block or Detect-Only Mode**: Monitor before blocking
-- **Path Exclusions**: Skip inspection for trusted paths
-- **Zero Installation Hassle**: Just `cargo install`, no system dependencies
+<p align="center">
+  <a href="https://registry.zentinelproxy.io/zentinelsec/">Registry</a> &middot;
+  <a href="https://docs.zentinelproxy.io">Docs</a> &middot;
+  <a href="https://github.com/zentinelproxy">All repositories</a>
+</p>
 
-## Comparison with Other WAF Agents
+This agent evaluates SecLang rules with
+[zentinel-modsec](https://github.com/zentinelproxy/zentinel-modsec), a pure-Rust
+reimplementation of libmodsecurity, and blocks with the status the rules ask
+for. It loads the stock OWASP CRS unchanged and ships as a single binary with
+nothing to install beside it.
 
-| Feature | ZentinelSec | ModSec | WAF |
-|---------|-------------|--------|-----|
-| Detection Rules | stock CRS, [conformance measured](#crs-conformance) | stock CRS (reference implementation) | 285 rules |
-| SecLang Support | Yes | Yes | No |
-| Custom Rules | Yes | Yes | No |
-| @detectSQLi/@detectXSS | Yes (pure Rust) | Yes (C lib) | No |
-| Dependencies | **Pure Rust** | libmodsecurity (C) | Pure Rust |
-| Binary Size | ~10MB | ~50MB | ~5MB |
-| Installation | `cargo install` | Requires libmodsecurity | `cargo install` |
+**Which ModSecurity agent?** This one uses the Rust engine. Its sibling
+[zentinel-agent-modsec](https://github.com/zentinelproxy/zentinel-agent-modsec)
+wraps the C libmodsecurity, the reference implementation, and needs that
+library installed wherever it runs. Because this engine is a reimplementation,
+its CRS behavior is measured rather than assumed (see
+[CRS conformance](#crs-conformance)); choose modsec when you need the reference
+behavior.
 
-**ZentinelSec aims to combine the two**: the stock CRS rule set like ModSec, with
-zero-dependency installation like WAF. Unlike ModSec it is not the reference
-implementation of SecLang, so its CRS behaviour is
-[measured against the upstream regression suite](#crs-conformance) rather than
-taken as given.
-
-## CRS conformance
-
-Detection is provided by [zentinel-modsec](https://github.com/zentinelproxy/zentinel-modsec),
-which runs the OWASP CRS regression suite — roughly 5,000 request/expectation
-pairs naming the rule IDs that must or must not fire — on every push.
-
-| | |
-|---|---|
-| Corpus | CRS `main` (4.31.0-dev), 5,184 runnable cases |
-| Passing | **4,806 (92.7%)** |
-
-That corpus runs in `DetectionOnly` at paranoia level 4, which is how CRS
-documents it. It measures whether individual rules **match**; it does not
-measure whether the WAF **decides** correctly, because in that mode nothing
-blocks and the anomaly score never reaches rule 949110. Both properties are
-tested, separately, in that repository.
-
-### Before deploying in blocking mode
-
-`--block-mode` defaults to `true`. Stock CRS is tested in exactly that
-configuration — `crs_does_not_block_ordinary_traffic` and `crs_detects_attacks`
-in `tests/crs_integration.rs` assert that ordinary requests pass and attacks are
-blocked, against a real CRS checkout.
-
-> **Upgrade from builds on `zentinel-modsec` 0.4.x.** 0.4.0 ran only the last
-> `setvar` of each rule, so CRS anomaly scores were dropped: an SQLi that only
-> libinjection (942100) catches was detected and let through
-> ([zentinel-modsec#47](https://github.com/zentinelproxy/zentinel-modsec/issues/47)).
-> It also loaded nothing past the first line of a rule file with CRLF line
-> endings ([#44](https://github.com/zentinelproxy/zentinel-modsec/pull/44)).
+> **Known limitations** (checked against stock CRS on 2026-10-21):
 >
-> Versions of `zentinel-modsec` before 0.4.0 deny **every** request under stock
-> CRS, `GET /` included, because CRS 920100 tests an unimplemented
-> `REQUEST_LINE` with a negated regex
-> ([zentinel-modsec#29](https://github.com/zentinelproxy/zentinel-modsec/issues/29)).
-> They also miss payloads that encode spaces as `+`, or that percent-encode the
-> `=` in a form body ([#34](https://github.com/zentinelproxy/zentinel-modsec/issues/34),
-> [#38](https://github.com/zentinelproxy/zentinel-modsec/issues/38)) — both
-> straightforward bypasses.
+> - Phase 2 rules run only when a request has a body. Most CRS detection, and
+>   the blocking evaluation in rule 949110, is phase 2, so an attack in the
+>   query string of a `GET` is detected by nothing and passes. `POST` bodies are
+>   inspected and blocked.
+> - A body larger than `--max-body-size` is passed on uninspected.
+> - `--response-inspection` is accepted but response bodies are not inspected.
+> - The agent listens on gRPC only; there is no Unix-socket mode.
+> - The released binary (0.3.0, which `zentinel bundle install zentinelsec`
+>   also installs) is built on zentinel-modsec 0.1 and does not run stock CRS:
+>   it exits at startup on current CRS with
+>   `unknown variable: MULTIPART_PART_HEADERS`, and engines before 0.4.0 deny
+>   every request under CRS. Build from `main` until a new release ships.
 
-## Installation
-
-### Using Bundle (Recommended)
+## Quick start
 
 ```bash
-# Install just this agent
-zentinel bundle install zentinelsec
+# 1. The OWASP CRS
+sudo git clone https://github.com/coreruleset/coreruleset /etc/modsecurity/crs
+sudo cp /etc/modsecurity/crs/crs-setup.conf.example /etc/modsecurity/crs/crs-setup.conf
 
-# Or install all bundled agents
-zentinel bundle install
+# 2. The agent, built from main (see Known limitations)
+cargo install --git https://github.com/zentinelproxy/zentinel-agent-zentinelsec
+
+# 3. Run it (crs-setup.conf first)
+zentinel-zentinelsec-agent \
+  --grpc-address 127.0.0.1:50051 \
+  --rules /etc/modsecurity/crs/crs-setup.conf \
+  --rules "/etc/modsecurity/crs/rules/*.conf"
 ```
 
-The bundle command downloads the correct binary for your platform and places it in the standard location. See the [bundle documentation](https://docs.zentinelproxy.io/deployment/bundle/) for details.
+Then point Zentinel at it. Request bodies reach agents only when the top-level
+`waf` block enables body inspection:
 
-### Using Cargo
+```kdl
+system {
+    worker-threads 0
+}
 
-`zentinel-agent-zentinelsec` is not published on crates.io, so `cargo install zentinel-agent-zentinelsec` does not
-work. Install straight from the repository instead:
+listeners {
+    listener "http" {
+        address "127.0.0.1:8080"
+        protocol "http"
+    }
+}
+
+// Request bodies reach agents only when this block enables them.
+waf {
+    mode "off"
+    body-inspection {
+        inspect-request-body #true
+        max-inspection-bytes 1048576
+    }
+}
+
+agents {
+    agent "zentinelsec" type="waf" {
+        grpc "http://127.0.0.1:50051"
+        events "request_headers" "request_body"
+        timeout-ms 200
+        failure-mode "closed"
+    }
+}
+
+filters {
+    filter "zentinelsec" {
+        type "agent"
+        agent "zentinelsec"
+        failure-mode "closed"
+    }
+}
+
+routes {
+    route "default" {
+        matches {
+            path-prefix "/"
+        }
+        upstream "backend"
+        filters "zentinelsec"
+    }
+}
+
+upstreams {
+    upstream "backend" {
+        target "127.0.0.1:3000"
+    }
+}
+```
+
+`failure-mode "closed"` on the filter rejects requests while the agent is
+unreachable; use `"open"` to forward them uninspected instead.
+
+```bash
+curl -i -d "id=1' OR '1'='1" http://127.0.0.1:8080/   # 403 with CRS loaded
+```
+
+## Install
+
+### Cargo (recommended for now)
+
+The crate is not on crates.io; install from the repository:
 
 ```bash
 cargo install --git https://github.com/zentinelproxy/zentinel-agent-zentinelsec
 ```
 
-This builds and installs the `zentinel-zentinelsec-agent` binary.
+This installs the `zentinel-zentinelsec-agent` binary built from `main`, on
+zentinel-modsec 0.5.0.
 
-### Prebuilt Binaries
+### Bundle
 
-Each [release](https://github.com/zentinelproxy/zentinel-agent-zentinelsec/releases) ships binaries
-for `linux-x86_64`, `linux-aarch64`, and `darwin-aarch64`:
+```bash
+zentinel bundle install zentinelsec
+```
+
+Installs release 0.3.0, which does not run stock CRS (see Known limitations).
+See the [bundle documentation](https://docs.zentinelproxy.io/deployment/bundle/).
+
+### Release binaries
+
+Each [release](https://github.com/zentinelproxy/zentinel-agent-zentinelsec/releases)
+ships `linux-x86_64`, `linux-aarch64` and `darwin-aarch64`:
 
 ```bash
 VERSION=0.3.0
@@ -118,7 +170,9 @@ tar -xzf zentinel-zentinelsec-agent.tar.gz
 sudo install -m 0755 zentinel-zentinelsec-agent /usr/local/bin/
 ```
 
-### From Source
+These are release 0.3.0, with the limitation above.
+
+### From source
 
 ```bash
 git clone https://github.com/zentinelproxy/zentinel-agent-zentinelsec
@@ -126,184 +180,93 @@ cd zentinel-agent-zentinelsec
 cargo build --release
 ```
 
-## Usage
+## Configuration
 
-```bash
-zentinel-zentinelsec-agent \
-  --socket /var/run/zentinel/zentinelsec.sock \
-  --rules /etc/modsecurity/crs/crs-setup.conf \
-  --rules "/etc/modsecurity/crs/rules/*.conf"
-```
+The agent is configured with command-line flags or environment variables. A
+`config { }` block on the proxy's `agent` definition does not reach it.
 
-### Command Line Options
+| Option | Environment | Default | Meaning |
+|---|---|---|---|
+| `--grpc-address` | `AGENT_GRPC_ADDRESS` | `0.0.0.0:50051` | gRPC listen address. The default listens on all interfaces; bind `127.0.0.1` when the proxy is local |
+| `--rules` | `ZENTINELSEC_RULES` | none | Rule file or glob; repeat the flag or comma-separate. Loaded in order, so put `crs-setup.conf` first. With no rules nothing is blocked |
+| `--block-mode` | `ZENTINELSEC_BLOCK_MODE` | `true` | Block on an intervention; `false` is detect-only |
+| `--exclude-paths` | `ZENTINELSEC_EXCLUDE_PATHS` | none | Comma-separated path prefixes that skip inspection |
+| `--body-inspection` | `ZENTINELSEC_BODY_INSPECTION` | `true` | Inspect request bodies |
+| `--max-body-size` | `ZENTINELSEC_MAX_BODY_SIZE` | `1048576` | Largest body inspected, in bytes; larger bodies pass uninspected |
+| `--response-inspection` | `ZENTINELSEC_RESPONSE_INSPECTION` | `false` | Accepted, not implemented |
+| `-v`, `--verbose` | `ZENTINELSEC_VERBOSE` | `false` | Debug logging |
 
-| Option | Environment Variable | Description | Default |
-|--------|---------------------|-------------|---------|
-| `--socket` | `AGENT_SOCKET` | Unix socket path | `/tmp/zentinel-zentinelsec.sock` |
-| `--rules` | `ZENTINELSEC_RULES` | Rule file paths (glob patterns supported) | - |
-| `--block-mode` | `ZENTINELSEC_BLOCK_MODE` | Block (true) or detect-only (false) | `true` |
-| `--exclude-paths` | `ZENTINELSEC_EXCLUDE_PATHS` | Paths to exclude (comma-separated) | - |
-| `--body-inspection` | `ZENTINELSEC_BODY_INSPECTION` | Enable request body inspection | `true` |
-| `--max-body-size` | `ZENTINELSEC_MAX_BODY_SIZE` | Maximum body size to inspect (bytes) | `1048576` (1MB) |
-| `--response-inspection` | `ZENTINELSEC_RESPONSE_INSPECTION` | Enable response body inspection | `false` |
-| `--verbose`, `-v` | `ZENTINELSEC_VERBOSE` | Enable debug logging | `false` |
+The boolean options are switches: `--block-mode` cannot take a value, so
+`--block-mode=false` is rejected. To turn one off, set the environment
+variable, e.g. `ZENTINELSEC_BLOCK_MODE=false`.
 
-## OWASP CRS Setup
+Rule files are passed to the engine as `Include`s with absolute paths, so data
+files that CRS references relatively resolve next to their rule file whatever
+the working directory. Paranoia level, anomaly thresholds and exclusions are
+set in the rules themselves (`crs-setup.conf` or your own file), as with any
+ModSecurity deployment. Proxy-side agent options are in the
+[agents reference](https://docs.zentinelproxy.io/configuration/agents/).
 
-### Download CRS
+## CRS conformance
 
-```bash
-# Clone the CRS repository
-sudo mkdir -p /etc/modsecurity
-sudo git clone https://github.com/coreruleset/coreruleset /etc/modsecurity/crs
+zentinel-modsec runs the OWASP CRS regression suite on every push. Its current
+result, from that repository: 4,806 of 5,184 runnable cases pass (92.7%,
+CRS `main` 4.31.0-dev). The corpus runs in `DetectionOnly` at paranoia level 4,
+as CRS documents it, so it measures whether rules **match**, not whether
+requests are **blocked**. Blocking with stock CRS is tested separately here:
+`crs_detects_attacks` and `crs_does_not_block_ordinary_traffic` in
+`tests/crs_integration.rs` run against a real CRS checkout (they drive the
+engine directly, so they do not cover the `GET` limitation above).
 
-# Copy example configuration
-sudo cp /etc/modsecurity/crs/crs-setup.conf.example /etc/modsecurity/crs/crs-setup.conf
-```
+Builds on zentinel-modsec before 0.5.0 are unsafe in blocking mode: 0.4.x kept
+only the last `setvar` of a rule, dropping CRS anomaly scores
+([zentinel-modsec#47](https://github.com/zentinelproxy/zentinel-modsec/issues/47)),
+and versions before 0.4.0 deny every request under stock CRS
+([zentinel-modsec#29](https://github.com/zentinelproxy/zentinel-modsec/issues/29)).
+`main` requires 0.5.0.
 
-### Run with CRS
+## How it works
 
-```bash
-zentinel-zentinelsec-agent \
-  --socket /var/run/zentinel/zentinelsec.sock \
-  --rules /etc/modsecurity/crs/crs-setup.conf \
-  --rules "/etc/modsecurity/crs/rules/*.conf"
-```
+On `request_headers` the agent runs phase 1 (URI, query string, headers). If
+that passes and body inspection is on, it buffers the body and runs phase 2
+when the last chunk arrives.
 
-## Zentinel Configuration
-
-```kdl
-agents {
-    agent "zentinelsec" {
-        type "custom"
-        transport "unix_socket" {
-            path "/var/run/zentinel/zentinelsec.sock"
-        }
-        events "request_headers" "request_body_chunk" "response_body_chunk"
-        timeout-ms 100
-        failure-mode "open"
-    }
-}
-
-routes {
-    route "all" {
-        matches { path-prefix "/" }
-        upstream "backend"
-        agents "zentinelsec"
-    }
-}
-```
-
-## Paranoia Levels
-
-Configure in `/etc/modsecurity/crs/crs-setup.conf`:
-
-```apache
-SecAction "id:900000,phase:1,pass,t:none,nolog,setvar:tx.blocking_paranoia_level=1"
-```
-
-| Level | Description | Use Case |
-|-------|-------------|----------|
-| 1 | Standard protection, minimal false positives | Production - most applications |
-| 2 | Elevated protection, some false positives | Security-sensitive apps |
-| 3 | High protection, moderate false positives | Staging/testing, or with tuning |
-| 4 | Maximum protection, high false positives | Security research |
-
-## Response Headers
-
-| Header | Description |
-|--------|-------------|
-| `X-WAF-Blocked` | `true` if request was blocked |
-| `X-WAF-Rule` | Rule ID that triggered the block |
-| `X-WAF-Message` | Detection message |
-| `X-WAF-Detected` | Detection message (detect-only mode) |
-
-## CRS Rule Categories
-
-| File Pattern | Protection |
-|--------------|------------|
-| REQUEST-913-* | Scanner detection |
-| REQUEST-920-* | Protocol enforcement |
-| REQUEST-930-* | Local file inclusion (LFI) |
-| REQUEST-931-* | Remote file inclusion (RFI) |
-| REQUEST-932-* | Remote code execution (RCE) |
-| REQUEST-941-* | Cross-site scripting (XSS) |
-| REQUEST-942-* | SQL injection |
-| REQUEST-943-* | Session fixation |
-| REQUEST-944-* | Java attacks |
-| RESPONSE-950-* | Data leakage |
-
-## Docker/Kubernetes
-
-```yaml
-# Environment variables
-env:
-  - name: AGENT_SOCKET
-    value: "/var/run/zentinel/zentinelsec.sock"
-  - name: ZENTINELSEC_RULES
-    value: "/etc/modsecurity/crs/crs-setup.conf,/etc/modsecurity/crs/rules/*.conf"
-  - name: ZENTINELSEC_BLOCK_MODE
-    value: "true"
-  - name: ZENTINELSEC_EXCLUDE_PATHS
-    value: "/health,/metrics"
-```
-
-## Writing Custom Rules
-
-Create custom rules using SecLang syntax:
-
-```apache
-# /etc/modsecurity/custom-rules.conf
-
-# Block requests with specific user-agent
-SecRule REQUEST_HEADERS:User-Agent "@contains badbot" \
-    "id:100001,phase:1,deny,status:403,msg:'Bad bot detected'"
-
-# Detect sensitive data in responses
-SecRule RESPONSE_BODY "@rx \b\d{3}-\d{2}-\d{4}\b" \
-    "id:100002,phase:4,deny,status:500,msg:'SSN detected in response'"
-```
-
-Load custom rules:
-
-```bash
-zentinel-zentinelsec-agent \
-  --rules /etc/modsecurity/crs/crs-setup.conf \
-  --rules "/etc/modsecurity/crs/rules/*.conf" \
-  --rules /etc/modsecurity/custom-rules.conf
-```
+| Outcome | What the agent returns |
+|---|---|
+| Intervention, block mode | The rule's status, body `Forbidden`, response headers `X-WAF-Blocked: true`, `X-WAF-Rule` (the first matching rule ID) and `X-WAF-Message` |
+| Intervention, detect-only | Allow, with `X-WAF-Detected` added to the request sent upstream |
+| Engine error | Allow, logged as a warning |
 
 ## Development
 
 ```bash
-# Run with debug logging
-RUST_LOG=debug cargo run -- --socket /tmp/test.sock --rules ./test-rules.conf
+cargo fmt --all --check
+cargo clippy --all-targets -- -D warnings
 
-# Run tests
+# The CRS tests need a checkout (or set ZENTINELSEC_SKIP_CRS_TESTS=1)
+mkdir -p test-rules
+git clone --depth 1 https://github.com/coreruleset/coreruleset.git test-rules/crs
+cp test-rules/crs/crs-setup.conf.example test-rules/crs/crs-setup.conf
 cargo test
-
-# Build release binary
-cargo build --release
 ```
 
-## Architecture
+Building needs Rust 1.94.1+.
 
-ZentinelSec uses [zentinel-modsec](https://github.com/zentinelproxy/zentinel-modsec), a pure Rust reimplementation of libmodsecurity:
+## Related
 
-- **Parser**: Full SecLang parser for SecRule, SecAction, SecMarker directives
-- **Variables**: REQUEST_URI, ARGS, REQUEST_HEADERS, TX collections, and more
-- **Operators**: 37+ operators including @rx, @pm, @detectSQLi, @detectXSS
-- **Transformations**: 35+ transformations (urlDecode, base64Decode, lowercase, etc.)
-- **Engine**: 5-phase transaction processing with rule chaining and anomaly scoring
-
-## Related Agents
-
-| Agent | Use Case |
-|-------|----------|
-| **[ModSec](/agents/modsec/)** | C-based libmodsecurity (if you need maximum compatibility) |
-| **[WAF](/agents/waf/)** | Lightweight, ~20 rules (if you need minimal overhead) |
-| **[AI Gateway](/agents/ai-gateway/)** | AI/LLM-specific security controls |
+- [Registry page](https://registry.zentinelproxy.io/zentinelsec/)
+- [zentinel-modsec](https://github.com/zentinelproxy/zentinel-modsec): the engine
+- [zentinel-agent-modsec](https://github.com/zentinelproxy/zentinel-agent-modsec): the same rules on the C libmodsecurity
+- [zentinel-agent-waf](https://github.com/zentinelproxy/zentinel-agent-waf): Zentinel's own rule set, no SecLang
+- [Agent protocol v2](https://docs.zentinelproxy.io/agents/v2/)
+- [Zentinel](https://github.com/zentinelproxy/zentinel)
 
 ## License
 
-Apache-2.0
+Apache-2.0, as declared in `Cargo.toml`. The repository has no `LICENSE` file yet.
+
+---
+
+<p align="center">
+  <sub>Part of <a href="https://zentinelproxy.io">Zentinel</a>, the security-first reverse proxy. The shisa guards the gate.</sub>
+</p>
