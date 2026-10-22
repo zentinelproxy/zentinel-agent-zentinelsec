@@ -1,6 +1,6 @@
 [package]
 name = "zentinel-agent-zentinelsec"
-version = "0.2.0"
+version = "0.4.0"
 edition = "2021"
 rust-version = "1.94.1"
 authors = ["Zentinel Contributors"]
@@ -23,8 +23,8 @@ path = "src/main.rs"
 
 [dependencies]
 # Zentinel protocol
-zentinel-agent-protocol = "0.6"
-zentinel-common = "0.5"
+zentinel-agent-protocol = "0.6.50"
+zentinel-common = "0.6.50"
 
 # Pure Rust ModSecurity implementation
 # >= 0.5.0 required. 0.4.0 kept only the last setvar of a rule, so CRS anomaly

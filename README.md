@@ -39,18 +39,18 @@ behavior.
 
 > **Known limitations** (checked against stock CRS on 2026-10-21):
 >
-> - Phase 2 rules run only when a request has a body. Most CRS detection, and
->   the blocking evaluation in rule 949110, is phase 2, so an attack in the
->   query string of a `GET` is detected by nothing and passes. `POST` bodies are
->   inspected and blocked.
+> - Up to 0.3.0, phase 2 rules ran only when a request had a body. Most CRS
+>   detection, and the blocking evaluation in rule 949110, is phase 2, so an
+>   attack in the query string of a `GET` passed. Fixed in 0.4.0.
 > - A body larger than `--max-body-size` is passed on uninspected.
 > - `--response-inspection` is accepted but response bodies are not inspected.
 > - The agent listens on gRPC only; there is no Unix-socket mode.
-> - The released binary (0.3.0, which `zentinel bundle install zentinelsec`
->   also installs) is built on zentinel-modsec 0.1 and does not run stock CRS:
->   it exits at startup on current CRS with
+> - Release 0.3.0 (which `zentinel bundle install zentinelsec` still
+>   installs) is built on zentinel-modsec 0.1 and does not run stock CRS: it
+>   exits at startup on current CRS with
 >   `unknown variable: MULTIPART_PART_HEADERS`, and engines before 0.4.0 deny
->   every request under CRS. Build from `main` until a new release ships.
+>   every request under CRS. 0.4.0 is built on zentinel-modsec 0.5.0; until it
+>   is released and the bundle points at it, build from `main`.
 
 ## Quick start
 
@@ -153,16 +153,19 @@ zentinel-modsec 0.5.0.
 zentinel bundle install zentinelsec
 ```
 
-Installs release 0.3.0, which does not run stock CRS (see Known limitations).
+Installs the release pinned in the proxy's bundle lock. Until that is 0.4.0
+it is 0.3.0, which does not run stock CRS (see Known limitations).
 See the [bundle documentation](https://docs.zentinelproxy.io/deployment/bundle/).
 
 ### Release binaries
 
 Each [release](https://github.com/zentinelproxy/zentinel-agent-zentinelsec/releases)
-ships `linux-x86_64`, `linux-aarch64` and `darwin-aarch64`:
+ships `linux-x86_64`, `linux-aarch64` and `darwin-aarch64`, each with a
+`.sha256`. From 0.4.0, every asset has passed `scripts/smoke-test.sh` (stock
+CRS behind a real Zentinel) before it was published.
 
 ```bash
-VERSION=0.3.0
+VERSION=0.4.0
 PLATFORM=linux-x86_64   # or linux-aarch64, darwin-aarch64
 curl -fsSL -o zentinel-zentinelsec-agent.tar.gz \
   "https://github.com/zentinelproxy/zentinel-agent-zentinelsec/releases/download/v${VERSION}/zentinel-zentinelsec-agent-${VERSION}-${PLATFORM}.tar.gz"
@@ -170,7 +173,7 @@ tar -xzf zentinel-zentinelsec-agent.tar.gz
 sudo install -m 0755 zentinel-zentinelsec-agent /usr/local/bin/
 ```
 
-These are release 0.3.0, with the limitation above.
+0.3.0 has the limitation above.
 
 ### From source
 
