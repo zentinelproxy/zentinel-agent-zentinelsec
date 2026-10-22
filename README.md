@@ -185,8 +185,12 @@ cargo build --release
 
 ## Configuration
 
-The agent is configured with command-line flags or environment variables. A
-`config { }` block on the proxy's `agent` definition does not reach it.
+The agent is configured with command-line flags or environment variables,
+and with a `config { }` block on the proxy's `agent` definition (see
+[below](#the-config--block)) once both sides deliver it: Zentinel from the
+release after 26.10_7, and an agent built against the matching
+`zentinel-agent-protocol` (the 0.6.50 gRPC server drops Configure events, so
+until then the block is silently ignored).
 
 | Option | Environment | Default | Meaning |
 |---|---|---|---|
@@ -202,6 +206,50 @@ The agent is configured with command-line flags or environment variables. A
 The boolean options are switches: `--block-mode` cannot take a value, so
 `--block-mode=false` is rejected. To turn one off, set the environment
 variable, e.g. `ZENTINELSEC_BLOCK_MODE=false`.
+
+### The `config { }` block
+
+```kdl
+agents {
+    agent "zentinelsec" type="waf" {
+        grpc address="http://127.0.0.1:50051"
+        events "request_headers" "request_body"
+        config {
+            rules-paths "/etc/modsecurity/crs/crs-setup.conf" "/etc/modsecurity/crs/rules/*.conf"
+            block-mode #true
+            exclude-paths "/health" "/metrics"
+            max-body-size 1048576
+        }
+    }
+}
+```
+
+Keys: `rules-paths` (alias `rules`), `block-mode`, `exclude-paths`,
+`body-inspection-enabled` (alias `body-inspection`), `max-body-size`,
+`response-inspection-enabled` (alias `response-inspection`). A list may be a
+single value.
+
+The proxy sends this block on every connection it opens to the agent: once per
+pooled connection at startup and again on every reconnect. The agent applies
+it by these rules:
+
+1. **Idempotent.** A block identical to the one already in effect (compared
+   by a hash of its canonical JSON) changes nothing. When the block does
+   change, the rule set is rebuilt only if `rules-paths` changed; the other
+   settings change in place. Requests whose body is being buffered are never
+   dropped by a configure: they are inspected when their last chunk arrives.
+2. **Merge, don't replace.** The block is overlaid on the flags and
+   environment: a key that is absent keeps the value from the command line,
+   so `config { block-mode #false }` keeps your `--rules`.
+3. **Reject what cannot be applied.** The configure fails (the agent ends the
+   stream, the proxy does not use the connection, and the active
+   configuration stays as it was) for an unknown or misspelled key, a value of
+   the wrong type, a list that is empty after parsing (`rules-paths ""`),
+   `max-body-size 0`, a `rules-paths` pattern that matches no file, rule files
+   that contain no rule, or a rule file that does not parse. A block that
+   names rules can therefore never leave the agent running with zero rules.
+4. **No secrets in logs.** A configure is logged with the hash of the block
+   and the names of the settings it changed, never the values.
 
 Rule files are passed to the engine as `Include`s with absolute paths, so data
 files that CRS references relatively resolve next to their rule file whatever
