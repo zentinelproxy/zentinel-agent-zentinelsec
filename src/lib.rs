@@ -33,8 +33,8 @@ use zentinel_agent_protocol::v2::{
     MetricsReport, ShutdownReason,
 };
 use zentinel_agent_protocol::{
-    AgentResponse, AuditMetadata, EventType, HeaderOp, RequestBodyChunkEvent, RequestHeadersEvent,
-    ResponseBodyChunkEvent, ResponseHeadersEvent,
+    AgentResponse, AuditMetadata, EventType, HeaderOp, RequestBodyChunkEvent, RequestCompleteEvent,
+    RequestHeadersEvent, ResponseBodyChunkEvent, ResponseHeadersEvent,
 };
 
 use zentinel_modsec::ModSecurity;
@@ -356,30 +356,35 @@ impl ZentinelSecAgent {
             }
         }
 
-        // Process body if provided (phase 2)
+        // Phase 2. `None` means a body is still coming and will be processed
+        // by a later call; `Some` (possibly empty) runs phase 2 now. Phase 2
+        // must run even without a body: CRS evaluates ARGS (the query
+        // string) for SQLi/XSS, and makes its anomaly-score blocking
+        // decision (949110), in phase 2. Skipping it for bodyless requests
+        // meant no GET was ever blocked under stock CRS.
         if let Some(body_data) = body {
             if !body_data.is_empty() {
                 tx.append_request_body(body_data)
                     .map_err(|e| anyhow::anyhow!("append_request_body failed: {}", e))?;
-                tx.process_request_body()
-                    .map_err(|e| anyhow::anyhow!("process_request_body failed: {}", e))?;
+            }
+            tx.process_request_body()
+                .map_err(|e| anyhow::anyhow!("process_request_body failed: {}", e))?;
 
-                // Check for intervention after body
-                if let Some(intervention) = tx.intervention() {
-                    let status = intervention.status;
-                    if status != 0 && status != 200 {
-                        debug!(
-                            correlation_id = correlation_id,
-                            status = status,
-                            "ZentinelSec intervention (body)"
-                        );
-                        let rule_ids = intervention.rule_ids.clone();
-                        let message = intervention
-                            .log
-                            .clone()
-                            .unwrap_or_else(|| "Blocked by ZentinelSec".to_string());
-                        return Ok(Some((status, message, rule_ids)));
-                    }
+            // Check for intervention after body
+            if let Some(intervention) = tx.intervention() {
+                let status = intervention.status;
+                if status != 0 && status != 200 {
+                    debug!(
+                        correlation_id = correlation_id,
+                        status = status,
+                        "ZentinelSec intervention (body)"
+                    );
+                    let rule_ids = intervention.rule_ids.clone();
+                    let message = intervention
+                        .log
+                        .clone()
+                        .unwrap_or_else(|| "Blocked by ZentinelSec".to_string());
+                    return Ok(Some((status, message, rule_ids)));
                 }
             }
         }
@@ -547,15 +552,19 @@ impl AgentHandlerV2 for ZentinelSecAgent {
             }
         }
 
-        // Always process headers immediately (phase 1)
-        // This detects attacks in URI, query string, and headers
+        // Run phases 1 and 2 now, with an empty body, so attacks in the URI,
+        // query string and headers are decided here. With body inspection on,
+        // the whole transaction runs again with the body once it has arrived
+        // (on_request_body_chunk). Whether a body follows cannot be known from
+        // the headers (HTTP/2 needs no Content-Length), so always wait for it.
+        let empty: &[u8] = &[];
         match self
             .process_request(
                 correlation_id,
                 &event.method,
                 &event.uri,
                 &event.headers,
-                None,
+                Some(empty),
             )
             .await
         {
@@ -634,6 +643,16 @@ impl AgentHandlerV2 for ZentinelSecAgent {
                 AgentResponse::default_allow()
             }
         }
+    }
+
+    async fn on_request_complete(&self, event: RequestCompleteEvent) -> AgentResponse {
+        // A request that never sent a body leaves its pending entry behind;
+        // drop it when the proxy reports the request finished.
+        self.pending_requests
+            .write()
+            .await
+            .remove(&event.correlation_id);
+        AgentResponse::default_allow()
     }
 
     async fn on_response_headers(&self, _event: ResponseHeadersEvent) -> AgentResponse {
@@ -970,5 +989,43 @@ mod tests {
             assert_eq!(i.status, 403);
             println!("Body SQLi blocked: {:?}", i.rule_ids);
         }
+    }
+
+    /// Phase 2 runs for a request without a body: CRS inspects ARGS (the
+    /// query string) and makes its blocking decision in phase 2, so a GET
+    /// must be able to be blocked by a phase-2 rule.
+    #[tokio::test]
+    async fn test_phase2_rule_blocks_bodyless_get() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("rules.conf"),
+            r#"SecRule ARGS "@detectSQLi" "id:10,phase:2,deny,status:403""#,
+        )
+        .unwrap();
+        let config = ZentinelSecConfig {
+            rules_paths: vec![dir.path().join("*.conf").display().to_string()],
+            ..Default::default()
+        };
+        let agent = ZentinelSecAgent::new(config).unwrap();
+        let headers = HashMap::new();
+        let empty: &[u8] = &[];
+
+        let blocked = agent
+            .process_request(
+                "c1",
+                "GET",
+                "/s?id=1%27%20OR%20%271%27%3D%271",
+                &headers,
+                Some(empty),
+            )
+            .await
+            .unwrap();
+        assert_eq!(blocked.map(|(status, _, _)| status), Some(403));
+
+        let clean = agent
+            .process_request("c2", "GET", "/s?q=hello", &headers, Some(empty))
+            .await
+            .unwrap();
+        assert!(clean.is_none());
     }
 }
