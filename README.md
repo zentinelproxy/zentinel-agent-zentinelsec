@@ -203,6 +203,17 @@ this agent 0.4.1 or later (built on `zentinel-agent-protocol` 0.6.51; the
 | `--response-inspection` | `ZENTINELSEC_RESPONSE_INSPECTION` | `false` | Accepted, not implemented |
 | `-v`, `--verbose` | `ZENTINELSEC_VERBOSE` | `false` | Debug logging |
 
+Logs are JSON on stdout. By default the agent, its handler
+(`zentinel_agent_zentinelsec`) and the rule engine (`zentinel_modsec`, at
+`warn`) are logged; `--verbose` raises all three to `debug`. `RUST_LOG`, when
+set, replaces these defaults, so it must name every target you want to see,
+e.g. `RUST_LOG=zentinel_zentinelsec_agent=info,zentinel_agent_zentinelsec=info,zentinel_modsec=warn`.
+With `RUST_LOG` set, `--verbose` does not change the filter, and the default
+directives also include `zentinel_agent_protocol=info`, so a bare
+`RUST_LOG=debug` turns on debug output for every dependency too. An empty
+`RUST_LOG` means the defaults; an invalid one is reported on stderr and the
+defaults are used.
+
 The boolean options are switches: `--block-mode` cannot take a value, so
 `--block-mode=false` is rejected. To turn one off, set the environment
 variable, e.g. `ZENTINELSEC_BLOCK_MODE=false`.

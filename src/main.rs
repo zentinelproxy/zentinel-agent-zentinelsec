@@ -70,21 +70,60 @@ impl Args {
     }
 }
 
+/// Default tracing directives.
+///
+/// The agent logs from three places, each under its own target: this binary,
+/// the library crate that holds the handler, and the rule engine
+/// (`zentinel_modsec`: warnings about rules it cannot honour, body processor
+/// failures at debug). A filter that misses one drops its output silently.
+/// The engine is logged at `warn` unless `--verbose`.
+fn default_log_filter(verbose: bool) -> String {
+    let level = if verbose { "debug" } else { "info" };
+    let engine = if verbose { "debug" } else { "warn" };
+    format!(
+        "{}={level},zentinel_agent_zentinelsec={level},zentinel_modsec={engine},zentinel_agent_protocol=info",
+        env!("CARGO_CRATE_NAME"),
+    )
+}
+
+/// The filter to install, and a message if `RUST_LOG` could not be used.
+///
+/// An unset or blank `RUST_LOG` (`Environment=RUST_LOG=` in a unit file) means
+/// the defaults; so does an invalid one, after saying so.
+fn build_env_filter(
+    rust_log: Option<&str>,
+    verbose: bool,
+) -> (tracing_subscriber::EnvFilter, Option<String>) {
+    use tracing_subscriber::EnvFilter;
+    let defaults = || EnvFilter::new(default_log_filter(verbose));
+    match rust_log.map(str::trim).filter(|v| !v.is_empty()) {
+        None => (defaults(), None),
+        Some(value) => match EnvFilter::try_new(value) {
+            Ok(filter) => (filter, None),
+            Err(e) => (
+                defaults(),
+                Some(format!(
+                    "ignoring invalid RUST_LOG ({e}); using the default log filter"
+                )),
+            ),
+        },
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Parse command line arguments
     let args = Args::parse();
 
-    // Initialize tracing
-    // The library logs under its own target (zentinel_agent_zentinelsec); the
-    // binary's target alone would hide every engine and configure message.
-    let log_level = if args.verbose { "debug" } else { "info" };
+    // Initialize tracing. RUST_LOG, when set, replaces the default directives.
+    let (env_filter, problem) =
+        build_env_filter(std::env::var("RUST_LOG").ok().as_deref(), args.verbose);
+    if let Some(problem) = problem {
+        // Logging is not set up yet, so this goes straight to stderr.
+        eprintln!("{problem}");
+    }
     tracing_subscriber::fmt()
-        .with_env_filter(format!(
-            "{}={level},zentinel_agent_zentinelsec={level},zentinel_agent_protocol=info",
-            env!("CARGO_CRATE_NAME"),
-            level = log_level
-        ))
+        .with_env_filter(env_filter)
         .json()
         .init();
 
@@ -136,4 +175,65 @@ async fn main() -> Result<()> {
         .map_err(|e| anyhow::anyhow!("{}", e))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tracing_subscriber::EnvFilter;
+
+    #[test]
+    fn default_filter_names_the_library_and_the_engine() {
+        let filter = default_log_filter(false);
+        assert!(
+            filter.contains(&format!("{}=info", env!("CARGO_CRATE_NAME"))),
+            "{filter}"
+        );
+        assert!(
+            filter.contains("zentinel_agent_zentinelsec=info"),
+            "{filter}"
+        );
+        assert!(filter.contains("zentinel_modsec=warn"), "{filter}");
+        assert!(EnvFilter::try_new(&filter).is_ok());
+    }
+
+    #[test]
+    fn blank_rust_log_means_the_defaults() {
+        for value in [None, Some(""), Some("  ")] {
+            let (filter, problem) = build_env_filter(value, false);
+            assert!(problem.is_none());
+            assert_eq!(
+                filter.to_string(),
+                EnvFilter::new(default_log_filter(false)).to_string()
+            );
+        }
+    }
+
+    #[test]
+    fn rust_log_replaces_the_defaults() {
+        let (filter, problem) = build_env_filter(Some("zentinel_modsec=error"), true);
+        assert!(problem.is_none());
+        assert_eq!(filter.to_string(), "zentinel_modsec=error");
+    }
+
+    #[test]
+    fn invalid_rust_log_falls_back_and_says_so() {
+        let (filter, problem) = build_env_filter(Some("info,foo=bogus"), false);
+        assert!(problem.unwrap().contains("invalid RUST_LOG"));
+        assert_eq!(
+            filter.to_string(),
+            EnvFilter::new(default_log_filter(false)).to_string()
+        );
+    }
+
+    #[test]
+    fn verbose_raises_the_library_and_the_engine_to_debug() {
+        let filter = default_log_filter(true);
+        assert!(
+            filter.contains("zentinel_agent_zentinelsec=debug"),
+            "{filter}"
+        );
+        assert!(filter.contains("zentinel_modsec=debug"), "{filter}");
+        assert!(EnvFilter::try_new(&filter).is_ok());
+    }
 }
