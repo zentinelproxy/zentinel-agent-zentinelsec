@@ -188,10 +188,9 @@ cargo build --release
 
 The agent is configured with command-line flags or environment variables,
 and with a `config { }` block on the proxy's `agent` definition (see
-[below](#the-config--block)) once both sides deliver it: Zentinel from the
-release after 26.10_7, and an agent built against the matching
-`zentinel-agent-protocol` (the 0.6.50 gRPC server drops Configure events, so
-until then the block is silently ignored).
+[below](#the-config--block)). The block needs Zentinel 26.10_8 or later and
+this agent 0.4.1 or later (built on `zentinel-agent-protocol` 0.6.51; the
+0.6.50 gRPC server dropped Configure events, so older builds ignore it).
 
 | Option | Environment | Default | Meaning |
 |---|---|---|---|

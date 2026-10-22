@@ -2845,9 +2845,9 @@ dependencies = [
 
 [[package]]
 name = "zentinel-agent-protocol"
-version = "0.6.50"
+version = "0.6.51"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1570e8f1bc467fb1bdead94ff2733935827d660d52d9fa9baf5ac92d8ee950cf"
+checksum = "0ce38b8694c814fa0fcfc2b62f31ffea4e900188a73220554561aa9d423918dc"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2905,9 +2905,9 @@ dependencies = [
 
 [[package]]
 name = "zentinel-common"
-version = "0.6.50"
+version = "0.6.51"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a896938d0d4b4f2321fa0a0c10f095723479444f2ed1339513d4abc8846ef9b7"
+checksum = "1079f0ca837edcfdad64ad08f7569b3e976427a6b054e07da59b92bc1a886240"
 dependencies = [
  "anyhow",
  "chrono",
