@@ -290,8 +290,12 @@ and versions before 0.4.0 deny every request under stock CRS
 ## How it works
 
 On `request_headers` the agent runs phase 1 (URI, query string, headers). If
-that passes and body inspection is on, it buffers the body and runs phase 2
-when the last chunk arrives.
+that passes and body inspection is on, bodyless requests run phase 2
+immediately (every present `Content-Length` is `0`, or `GET`/`HEAD` without
+`Content-Length` and without chunked `Transfer-Encoding`); other requests are
+buffered until the last body chunk arrives. Pending buffers are removed when
+the response starts, on request completion, or when the body is over the size
+limit, with a bounded map and fail-closed behavior when limits are exceeded.
 
 | Outcome | What the agent returns |
 |---|---|
