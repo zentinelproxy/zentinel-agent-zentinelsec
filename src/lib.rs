@@ -790,10 +790,12 @@ impl AgentHandlerV2 for ZentinelSecAgent {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
-        // Only record the window: new requests are refused until it ends
-        // (on_request_headers). Bodies already being buffered are kept and
-        // inspected when their last chunk arrives; dropping them here would
-        // let a body that straddles the drain through uninspected.
+        // Only record the window, which health_status reports as Draining.
+        // Bodies already being buffered are kept and inspected when their
+        // last chunk arrives; dropping them here would let a body that
+        // straddles the drain through uninspected. Requests that still arrive
+        // are inspected as usual: refusing them with a block would reach the
+        // client as a WAF decision (a 503) instead of the route's failure mode.
         self.draining
             .store(now.saturating_add(duration_ms), Ordering::Relaxed);
     }
@@ -802,27 +804,6 @@ impl AgentHandlerV2 for ZentinelSecAgent {
         self.requests_total.fetch_add(1, Ordering::Relaxed);
         let path = &event.uri;
         let correlation_id = &event.metadata.correlation_id;
-
-        // A draining agent takes no new requests; requests already in flight
-        // finish, and their buffered bodies are still inspected (on_drain
-        // keeps them). Detect-only mode never blocks, so it keeps inspecting.
-        if self.is_draining() && self.engine.read().await.config.block_mode {
-            self.requests_blocked.fetch_add(1, Ordering::Relaxed);
-            info!(
-                correlation_id = correlation_id,
-                "Refusing new request while draining"
-            );
-            return AgentResponse::block(503, Some("Service Unavailable".to_string()))
-                .add_response_header(HeaderOp::Set {
-                    name: "X-WAF-Blocked".to_string(),
-                    value: "true".to_string(),
-                })
-                .with_audit(AuditMetadata {
-                    tags: vec!["zentinelsec".to_string(), "draining".to_string()],
-                    reason_codes: vec!["agent draining".to_string()],
-                    ..Default::default()
-                });
-        }
 
         // Check exclusions
         {

@@ -1,5 +1,8 @@
-//! Drain handling (#19): a drain stops the agent taking new requests, but the
-//! requests already in flight finish, and their bodies are still inspected.
+//! Drain handling (#19): requests in flight during a drain finish and their
+//! bodies are still inspected. The drain is signalled through health
+//! (`Draining`) only; requests that still arrive are inspected as usual, never
+//! refused with a block (the proxy would turn that into a WAF 503 instead of
+//! the route's failure mode).
 
 use base64::Engine;
 use std::collections::HashMap;
@@ -94,47 +97,47 @@ async fn a_body_that_straddles_a_drain_is_still_inspected() {
     assert_eq!(agent.pending_count().await, 0);
 }
 
+/// A drain changes health only: a new clean request is still allowed and a
+/// new attack is still blocked by the rules, not refused with a 503.
 #[tokio::test]
-async fn new_requests_are_refused_while_draining() {
+async fn new_requests_are_still_inspected_while_draining() {
     let dir = tempfile::tempdir().unwrap();
     let agent = agent(&dir, true);
     assert!(matches!(agent.health_status().state, HealthState::Healthy));
 
     agent.on_drain(30_000, DrainReason::Maintenance).await;
-
-    let refused = agent
-        .on_request_headers(headers_event("new", "GET", "/"))
-        .await;
-    assert!(
-        matches!(refused.decision, Decision::Block { status: 503, .. }),
-        "a draining agent must not take new requests, got {:?}",
-        refused.decision
-    );
-    assert_eq!(agent.pending_count().await, 0);
     assert!(matches!(
         agent.health_status().state,
         HealthState::Draining { eta_ms: Some(_) }
     ));
-}
 
-/// Detect-only mode never blocks, so a drain does not make it start.
-#[tokio::test]
-async fn detect_only_mode_keeps_inspecting_while_draining() {
-    let dir = tempfile::tempdir().unwrap();
-    let agent = agent(&dir, false);
-
-    agent.on_drain(30_000, DrainReason::Maintenance).await;
-
-    let response = agent
-        .on_request_headers(headers_event("new", "GET", "/"))
+    let clean = agent
+        .on_request_headers(headers_event("clean", "GET", "/"))
         .await;
-    assert!(matches!(response.decision, Decision::Allow));
+    assert!(
+        matches!(clean.decision, Decision::Allow),
+        "a clean request during a drain must be allowed, got {:?}",
+        clean.decision
+    );
+
+    let headers = agent
+        .on_request_headers(headers_event("attack", "POST", "/submit"))
+        .await;
+    assert!(matches!(headers.decision, Decision::Allow));
+    let body = agent
+        .on_request_body_chunk(body_event("attack", "id=1 UNION SELECT password", 0, true))
+        .await;
+    assert!(
+        matches!(body.decision, Decision::Block { status: 403, .. }),
+        "an attack during a drain must be blocked by the rules, got {:?}",
+        body.decision
+    );
 }
 
-/// The drain is bounded by its duration: afterwards the agent takes requests
+/// The drain is bounded by its duration: afterwards health is `Healthy`
 /// again (the protocol has no "resume" message).
 #[tokio::test]
-async fn the_agent_takes_requests_again_after_the_drain_window() {
+async fn health_is_healthy_again_after_the_drain_window() {
     let dir = tempfile::tempdir().unwrap();
     let agent = agent(&dir, true);
 
