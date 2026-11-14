@@ -790,7 +790,14 @@ impl AgentHandlerV2 for ZentinelSecAgent {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
-        self.draining.store(now + duration_ms, Ordering::Relaxed);
+        // Only record the window, which health_status reports as Draining.
+        // Bodies already being buffered are kept and inspected when their
+        // last chunk arrives; dropping them here would let a body that
+        // straddles the drain through uninspected. Requests that still arrive
+        // are inspected as usual: refusing them with a block would reach the
+        // client as a WAF decision (a 503) instead of the route's failure mode.
+        self.draining
+            .store(now.saturating_add(duration_ms), Ordering::Relaxed);
     }
 
     async fn on_request_headers(&self, event: RequestHeadersEvent) -> AgentResponse {
