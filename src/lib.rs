@@ -790,13 +790,39 @@ impl AgentHandlerV2 for ZentinelSecAgent {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
-        self.draining.store(now + duration_ms, Ordering::Relaxed);
+        // Only record the window: new requests are refused until it ends
+        // (on_request_headers). Bodies already being buffered are kept and
+        // inspected when their last chunk arrives; dropping them here would
+        // let a body that straddles the drain through uninspected.
+        self.draining
+            .store(now.saturating_add(duration_ms), Ordering::Relaxed);
     }
 
     async fn on_request_headers(&self, event: RequestHeadersEvent) -> AgentResponse {
         self.requests_total.fetch_add(1, Ordering::Relaxed);
         let path = &event.uri;
         let correlation_id = &event.metadata.correlation_id;
+
+        // A draining agent takes no new requests; requests already in flight
+        // finish, and their buffered bodies are still inspected (on_drain
+        // keeps them). Detect-only mode never blocks, so it keeps inspecting.
+        if self.is_draining() && self.engine.read().await.config.block_mode {
+            self.requests_blocked.fetch_add(1, Ordering::Relaxed);
+            info!(
+                correlation_id = correlation_id,
+                "Refusing new request while draining"
+            );
+            return AgentResponse::block(503, Some("Service Unavailable".to_string()))
+                .add_response_header(HeaderOp::Set {
+                    name: "X-WAF-Blocked".to_string(),
+                    value: "true".to_string(),
+                })
+                .with_audit(AuditMetadata {
+                    tags: vec!["zentinelsec".to_string(), "draining".to_string()],
+                    reason_codes: vec!["agent draining".to_string()],
+                    ..Default::default()
+                });
+        }
 
         // Check exclusions
         {
