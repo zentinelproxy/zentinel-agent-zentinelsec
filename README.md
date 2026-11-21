@@ -301,19 +301,30 @@ and versions before 0.4.0 deny every request under stock CRS
 
 ## How it works
 
-On `request_headers` the agent runs phase 1 (URI, query string, headers). If
-that passes and body inspection is on, bodyless requests run phase 2
-immediately (every present `Content-Length` is `0`, or `GET`/`HEAD` without
-`Content-Length` and without chunked `Transfer-Encoding`); other requests are
-buffered until the last body chunk arrives. Pending buffers are removed when
-the response starts, on request completion, or when the body is over the size
-limit, with a bounded map and fail-closed behavior when limits are exceeded.
+On `request_headers` the agent runs phases 1 and 2 on the URI, query string
+and headers, with an empty body (CRS inspects `ARGS` and makes its blocking
+decision in phase 2). If that passes and body inspection is on, it buffers the
+body and, when the last chunk arrives, runs the rules again with the body.
+
+A request is held only while its body may still arrive. Requests whose every
+`Content-Length` is `0` are not held. Others are released by their last body
+chunk, by the start of their response, or after 120 s without a body chunk;
+at most 100 000 are held at once. A request on an excluded path, one detected
+at the headers in detect-only mode, or one that hit an engine error keeps only
+a marker, so its body is allowed without inspection.
+
+The agent fails closed (in block mode) when it cannot inspect a body it
+should: a body chunk with no pending request (released, or refused at the
+limit) or one that does not decode gets a `403`, as does a new request while
+the limit is reached. Detect-only mode never blocks for these; it logs a
+warning and allows.
 
 | Outcome | What the agent returns |
 |---|---|
 | Intervention, block mode | The rule's status, body `Forbidden`, response headers `X-WAF-Blocked: true`, `X-WAF-Rule` (the first matching rule ID) and `X-WAF-Message` |
 | Intervention, detect-only | Allow, with `X-WAF-Detected` added to the request sent upstream |
 | Engine error | Allow, logged as a warning |
+| Body chunk the agent cannot inspect, or the pending-request limit reached, block mode | `403`, logged as `Blocking request (fail-closed)`; detect-only allows and logs a warning |
 
 ## Development
 
