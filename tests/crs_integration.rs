@@ -351,3 +351,45 @@ fn crs_does_not_block_ordinary_crawlers() {
     );
     assert!(blocked, "a SQL injection must still be blocked");
 }
+
+#[test]
+fn crs_blocks_an_attack_at_every_paranoia_level() {
+    // Up to zentinel-modsec 0.8.0, `skipAfter` to a marker directly after the
+    // rule skipped the rest of the phase. At blocking paranoia level 3 the
+    // CRS's level gates sit right before each file's end marker, so phase 2
+    // ended in REQUEST-911 and nothing was blocked (zentinel-modsec#97).
+    let Some(dir) = crs_dir() else { return };
+    let scratch = tempfile::tempdir().unwrap();
+
+    for level in 1..=4 {
+        let level_conf = scratch.path().join(format!("paranoia-{level}.conf"));
+        std::fs::write(
+            &level_conf,
+            format!(
+                "SecAction \"id:900000,phase:1,pass,nolog,t:none,\
+                 setvar:tx.blocking_paranoia_level={level}\"\n"
+            ),
+        )
+        .unwrap();
+        let config = ZentinelSecConfig {
+            rules_paths: vec![
+                dir.join("crs-setup.conf").display().to_string(),
+                level_conf.display().to_string(),
+                dir.join("rules/*.conf").display().to_string(),
+            ],
+            ..Default::default()
+        };
+        let e = ZentinelSecEngine::new(config).expect("CRS should load");
+        let (blocked, _) = probe(
+            &e,
+            "GET",
+            "/u?id=1'+UNION+SELECT+password+FROM+users--+",
+            &[],
+            b"",
+        );
+        assert!(
+            blocked,
+            "SQL injection not blocked at paranoia level {level}"
+        );
+    }
+}

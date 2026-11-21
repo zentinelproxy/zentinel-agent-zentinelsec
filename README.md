@@ -46,6 +46,11 @@ behavior.
 > - A body larger than `--max-body-size` is passed on uninspected.
 > - `--response-inspection` is accepted but response bodies are not inspected.
 > - The agent listens on gRPC only; there is no Unix-socket mode.
+> - Up to 0.5.0, with the CRS at blocking paranoia level 3, attacks were not
+>   blocked: a `skipAfter` off-by-one in the engine ended phase 2 before the
+>   blocking evaluation. Fixed in 0.5.1, built on zentinel-modsec 0.8.1
+>   ([zentinel-modsec#97](https://github.com/zentinelproxy/zentinel-modsec/pull/97)).
+>   Levels 1, 2 and 4 were not affected.
 > - Up to 0.4.1 (built on zentinel-modsec 0.5.0), `@detectSQLi` was an
 >   approximation of libinjection that flagged ordinary crawler User-Agents, so
 >   stock CRS blocked Googlebot, bingbot, AhrefsBot and others (rule 942100,
@@ -149,7 +154,7 @@ cargo install --git https://github.com/zentinelproxy/zentinel-agent-zentinelsec
 ```
 
 This installs the `zentinel-zentinelsec-agent` binary built from `main`, on
-zentinel-modsec 0.8.0.
+zentinel-modsec 0.8.1.
 
 ### Bundle
 
@@ -159,7 +164,7 @@ zentinel bundle install zentinelsec
 
 Installs the release pinned in the proxy's bundle lock: 0.4.1 from Zentinel
 26.10_9 on, 0.3.0 before that (which does not run stock CRS, see Known
-limitations). 0.5.0, with the crawler fix, ships once the bundle lock pins it.
+limitations). 0.5.1 is the release to run.
 See the [bundle documentation](https://docs.zentinelproxy.io/deployment/bundle/).
 
 ### Release binaries
@@ -170,7 +175,7 @@ ships `linux-x86_64`, `linux-aarch64` and `darwin-aarch64`, each with a
 CRS behind a real Zentinel) before it was published.
 
 ```bash
-VERSION=0.5.0
+VERSION=0.5.1
 PLATFORM=linux-x86_64   # or linux-aarch64, darwin-aarch64
 curl -fsSL -o zentinel-zentinelsec-agent.tar.gz \
   "https://github.com/zentinelproxy/zentinel-agent-zentinelsec/releases/download/v${VERSION}/zentinel-zentinelsec-agent-${VERSION}-${PLATFORM}.tar.gz"
@@ -292,7 +297,7 @@ only the last `setvar` of a rule, dropping CRS anomaly scores
 ([zentinel-modsec#47](https://github.com/zentinelproxy/zentinel-modsec/issues/47)),
 and versions before 0.4.0 deny every request under stock CRS
 ([zentinel-modsec#29](https://github.com/zentinelproxy/zentinel-modsec/issues/29)).
-`main` requires 0.8.0.
+`main` requires 0.8.1.
 
 ## How it works
 
