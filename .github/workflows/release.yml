@@ -68,7 +68,7 @@ jobs:
             artifact: linux-aarch64
             zentinel: linux-arm64
           - target: aarch64-apple-darwin
-            os: macos-14
+            os: macos-latest
             artifact: darwin-aarch64
             zentinel: darwin-arm64
           # darwin-x86_64 is not built: macOS Intel runners are scarce and the
