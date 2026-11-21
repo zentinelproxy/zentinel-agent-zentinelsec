@@ -2883,7 +2883,7 @@ dependencies = [
 
 [[package]]
 name = "zentinel-agent-zentinelsec"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2926,9 +2926,9 @@ dependencies = [
 
 [[package]]
 name = "zentinel-modsec"
-version = "0.5.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc4cde16c36470b447d91a46df883027731517d51636c1a5bbd743738bb9b853"
+checksum = "2ad4ca039c70f36854bc1389acf3dc9caab71a91a18fc91a1da495b5a233751c"
 dependencies = [
  "aho-corasick",
  "base64 0.22.1",
@@ -2936,8 +2936,10 @@ dependencies = [
  "glob",
  "hex",
  "html-escape",
+ "indexmap",
  "ipnetwork",
  "md-5",
+ "memchr",
  "once_cell",
  "percent-encoding",
  "phf",
