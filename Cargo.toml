@@ -1,6 +1,6 @@
 [package]
 name = "zentinel-agent-zentinelsec"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 rust-version = "1.94.1"
 authors = ["Zentinel Contributors"]
@@ -31,7 +31,7 @@ zentinel-common = "0.6.51"
 # User-Agents are no longer flagged under CRS 942100 (zentinel-modsec#84).
 # 0.4.0 kept only the last setvar of a rule (zentinel-modsec#47); 0.3.0 and
 # earlier deny every request under stock CRS (zentinel-modsec#29).
-zentinel-modsec = "0.8.1"
+zentinel-modsec = "0.9.0"
 
 # Async runtime
 tokio = { version = "1.40", features = ["full"] }
