@@ -46,12 +46,15 @@ behavior.
 > - A body larger than `--max-body-size` is passed on uninspected.
 > - `--response-inspection` is accepted but response bodies are not inspected.
 > - The agent listens on gRPC only; there is no Unix-socket mode.
-> - Release 0.3.0 (which `zentinel bundle install zentinelsec` still
->   installs) is built on zentinel-modsec 0.1 and does not run stock CRS: it
->   exits at startup on current CRS with
->   `unknown variable: MULTIPART_PART_HEADERS`, and engines before 0.4.0 deny
->   every request under CRS. 0.4.0 is built on zentinel-modsec 0.5.0; until it
->   is released and the bundle points at it, build from `main`.
+> - Up to 0.4.1 (built on zentinel-modsec 0.5.0), `@detectSQLi` was an
+>   approximation of libinjection that flagged ordinary crawler User-Agents, so
+>   stock CRS blocked Googlebot, bingbot, AhrefsBot and others (rule 942100,
+>   then 949110). Fixed in 0.5.0, built on zentinel-modsec 0.8.0
+>   ([zentinel-modsec#84](https://github.com/zentinelproxy/zentinel-modsec/issues/84)).
+> - Release 0.3.0 is built on zentinel-modsec 0.1 and does not run stock CRS:
+>   it exits at startup on current CRS with
+>   `unknown variable: MULTIPART_PART_HEADERS`. The bundle installs 0.4.1 from
+>   Zentinel 26.10_9 on; earlier releases install 0.3.0.
 
 ## Quick start
 
@@ -146,7 +149,7 @@ cargo install --git https://github.com/zentinelproxy/zentinel-agent-zentinelsec
 ```
 
 This installs the `zentinel-zentinelsec-agent` binary built from `main`, on
-zentinel-modsec 0.5.0.
+zentinel-modsec 0.8.0.
 
 ### Bundle
 
@@ -154,8 +157,9 @@ zentinel-modsec 0.5.0.
 zentinel bundle install zentinelsec
 ```
 
-Installs the release pinned in the proxy's bundle lock. Until that is 0.4.0
-it is 0.3.0, which does not run stock CRS (see Known limitations).
+Installs the release pinned in the proxy's bundle lock: 0.4.1 from Zentinel
+26.10_9 on, 0.3.0 before that (which does not run stock CRS, see Known
+limitations). 0.5.0, with the crawler fix, ships once the bundle lock pins it.
 See the [bundle documentation](https://docs.zentinelproxy.io/deployment/bundle/).
 
 ### Release binaries
@@ -166,7 +170,7 @@ ships `linux-x86_64`, `linux-aarch64` and `darwin-aarch64`, each with a
 CRS behind a real Zentinel) before it was published.
 
 ```bash
-VERSION=0.4.0
+VERSION=0.5.0
 PLATFORM=linux-x86_64   # or linux-aarch64, darwin-aarch64
 curl -fsSL -o zentinel-zentinelsec-agent.tar.gz \
   "https://github.com/zentinelproxy/zentinel-agent-zentinelsec/releases/download/v${VERSION}/zentinel-zentinelsec-agent-${VERSION}-${PLATFORM}.tar.gz"
@@ -276,16 +280,19 @@ result, from that repository: 4,806 of 5,184 runnable cases pass (92.7%,
 CRS `main` 4.31.0-dev). The corpus runs in `DetectionOnly` at paranoia level 4,
 as CRS documents it, so it measures whether rules **match**, not whether
 requests are **blocked**. Blocking with stock CRS is tested separately here:
-`crs_detects_attacks` and `crs_does_not_block_ordinary_traffic` in
+`crs_detects_attacks`, `crs_does_not_block_ordinary_traffic` and
+`crs_does_not_block_ordinary_crawlers` in
 `tests/crs_integration.rs` run against a real CRS checkout (they drive the
 engine directly, so they do not cover the `GET` limitation above).
 
-Builds on zentinel-modsec before 0.5.0 are unsafe in blocking mode: 0.4.x kept
+Builds on zentinel-modsec before 0.8.0 block ordinary crawlers under stock CRS
+([zentinel-modsec#84](https://github.com/zentinelproxy/zentinel-modsec/issues/84)),
+and builds before 0.5.0 are unsafe in blocking mode: 0.4.x kept
 only the last `setvar` of a rule, dropping CRS anomaly scores
 ([zentinel-modsec#47](https://github.com/zentinelproxy/zentinel-modsec/issues/47)),
 and versions before 0.4.0 deny every request under stock CRS
 ([zentinel-modsec#29](https://github.com/zentinelproxy/zentinel-modsec/issues/29)).
-`main` requires 0.5.0.
+`main` requires 0.8.0.
 
 ## How it works
 

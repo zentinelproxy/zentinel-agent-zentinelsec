@@ -299,3 +299,55 @@ fn a_block_names_the_rule_that_caused_it() {
         "the reported rule should be the one that blocked, got {ids:?}"
     );
 }
+
+/// A `GET /` from a client whose only distinctive header is its User-Agent.
+fn blocked_for_user_agent(
+    e: &ZentinelSecEngine,
+    user_agent: &str,
+    uri: &str,
+) -> (bool, Vec<String>) {
+    let mut tx = e.modsec().new_transaction();
+    tx.process_uri(uri, "GET", "HTTP/1.1").unwrap();
+    tx.add_request_header("Host", "example.com").unwrap();
+    tx.add_request_header("User-Agent", user_agent).unwrap();
+    tx.add_request_header("Accept", "*/*").unwrap();
+    tx.process_request_headers().unwrap();
+    tx.process_request_body().unwrap();
+    let ids = tx
+        .intervention()
+        .map(|i| i.rule_ids.clone())
+        .unwrap_or_default();
+    let blocked = tx
+        .intervention()
+        .map(|i| i.status != 0 && i.status != 200)
+        .unwrap_or(false);
+    (blocked, ids)
+}
+
+#[test]
+fn crs_does_not_block_ordinary_crawlers() {
+    // Before zentinel-modsec 0.8.0, @detectSQLi was an approximation of
+    // libinjection that read `Mozilla/5.0 (` as SQL, so CRS 942100 blocked
+    // these crawlers (zentinel-modsec#84). libinjection itself does not.
+    let Some(dir) = crs_dir() else { return };
+    let e = engine(&dir);
+
+    for user_agent in [
+        "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+        "Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)",
+        "Mozilla/5.0 (compatible; PetalBot;+https://webmaster.petalsearch.com/site/petalbot)",
+        "meta-externalagent/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)",
+    ] {
+        let (blocked, ids) = blocked_for_user_agent(&e, user_agent, "/");
+        assert!(!blocked, "{user_agent} was blocked by {ids:?}");
+    }
+
+    // The same request with an injection in the query is still blocked.
+    let (blocked, _) = blocked_for_user_agent(
+        &e,
+        "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "/?id=1%27%20UNION%20SELECT%20password%20FROM%20users--",
+    );
+    assert!(blocked, "a SQL injection must still be blocked");
+}
