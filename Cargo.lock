@@ -2926,9 +2926,9 @@ dependencies = [
 
 [[package]]
 name = "zentinel-modsec"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54b483d410bd749875fbb49d35b5b7e6dec20f70deb6ae7b002b6930a57765b0"
+checksum = "50974a1bd65fcd7452438a591de59aa08821edf13156c4fa51f1f95803cac8bc"
 dependencies = [
  "aho-corasick",
  "base64 0.22.1",
