@@ -78,8 +78,10 @@ zentinel-zentinelsec-agent \
   --rules "/etc/modsecurity/crs/rules/*.conf"
 ```
 
-Then point Zentinel at it. Request bodies reach agents only when the top-level
-`waf` block enables body inspection:
+Then point Zentinel at it. Request bodies reach the agent because it subscribes
+to `request_body` (from Zentinel 26.10_8; earlier releases sent bodies only when
+a top-level `waf` block enabled body inspection). The `waf` block sets how much
+of a body the proxy sends:
 
 ```kdl
 system {
@@ -93,7 +95,7 @@ listeners {
     }
 }
 
-// Request bodies reach agents only when this block enables them.
+// How much of a request body the proxy sends to agents.
 waf {
     mode "off"
     body-inspection {
@@ -107,7 +109,6 @@ agents {
         grpc "http://127.0.0.1:50051"
         events "request_headers" "request_body"
         timeout-ms 200
-        failure-mode "closed"
     }
 }
 
@@ -281,8 +282,8 @@ ModSecurity deployment. Proxy-side agent options are in the
 ## CRS conformance
 
 zentinel-modsec runs the OWASP CRS regression suite on every push. Its current
-result, from that repository: 4,806 of 5,184 runnable cases pass (92.7%,
-CRS `main` 4.31.0-dev). The corpus runs in `DetectionOnly` at paranoia level 4,
+result, from that repository: 4,979 of 5,184 runnable cases pass (96.0%,
+zentinel-modsec 0.13.1, at the CRS commit its CI pins). The corpus runs in `DetectionOnly` at paranoia level 4,
 as CRS documents it, so it measures whether rules **match**, not whether
 requests are **blocked**. Blocking with stock CRS is tested separately here:
 `crs_detects_attacks`, `crs_does_not_block_ordinary_traffic` and
