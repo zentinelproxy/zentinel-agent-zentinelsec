@@ -154,7 +154,7 @@ cargo install --git https://github.com/zentinelproxy/zentinel-agent-zentinelsec
 ```
 
 This installs the `zentinel-zentinelsec-agent` binary built from `main`, on
-zentinel-modsec 0.11.0.
+zentinel-modsec 0.13.1.
 
 ### Bundle
 
@@ -162,9 +162,9 @@ zentinel-modsec 0.11.0.
 zentinel bundle install zentinelsec
 ```
 
-Installs the release pinned in the proxy's bundle lock: 0.4.1 from Zentinel
-26.10_9 on, 0.3.0 before that (which does not run stock CRS, see Known
-limitations). 0.5.4 is the release to run.
+Installs the release pinned in the proxy's bundle lock (0.3.0 before Zentinel
+26.10_9, which does not run stock CRS, see Known limitations). 0.6.0 is the
+release to run.
 See the [bundle documentation](https://docs.zentinelproxy.io/deployment/bundle/).
 
 ### Release binaries
@@ -175,7 +175,7 @@ ships `linux-x86_64`, `linux-aarch64` and `darwin-aarch64`, each with a
 CRS behind a real Zentinel) before it was published.
 
 ```bash
-VERSION=0.5.4
+VERSION=0.6.0
 PLATFORM=linux-x86_64   # or linux-aarch64, darwin-aarch64
 curl -fsSL -o zentinel-zentinelsec-agent.tar.gz \
   "https://github.com/zentinelproxy/zentinel-agent-zentinelsec/releases/download/v${VERSION}/zentinel-zentinelsec-agent-${VERSION}-${PLATFORM}.tar.gz"
